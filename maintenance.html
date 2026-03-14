@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Site Under Maintenance - Velona</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #ffffff;
+            color: #2d4a2f; /* Dark greenish text */
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .maintenance-container {
+            text-align: center;
+            max-width: 600px;
+            padding: 2rem;
+            background: #ffffff;
+            border-radius: 12px;
+            border: 1px solid #cfe5cf;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        }
+
+        .maintenance-icon {
+            font-size: 4rem;
+            color: #6bbf73; /* Pale green */
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.8rem;
+            color: #2d4a2f;
+        }
+
+        p {
+            font-size: 1rem;
+            font-weight: 400;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+            color: #3a5d3a;
+        }
+
+        /* Countdown */
+        .countdown {
+            background: #f5fbf5;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid #cfe5cf;
+        }
+
+        .countdown h4 {
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+            color: #2d4a2f;
+        }
+
+        .countdown-timer {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #6bbf73;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Features Section */
+        .features {
+            display: none; /* Minimal design — hidden extra info */
+        }
+
+        /* Contact Info */
+        .contact-info h3 {
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            color: #2d4a2f;
+        }
+
+        .contact-links {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .contact-link {
+            color: #2d4a2f;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 1rem;
+            background: #f5fbf5;
+            border-radius: 25px;
+            border: 1px solid #cfe5cf;
+            transition: background 0.3s ease;
+        }
+
+        .contact-link:hover {
+            background: #e3f4e3;
+        }
+
+        /* Admin Notice */
+        .admin-notice {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #6bbf73;
+            color: white;
+            padding: 0.8rem 1rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            .maintenance-container {
+                margin: 1rem;
+                padding: 1.5rem;
+            }
+            h1 {
+                font-size: 1.5rem;
+            }
+            .maintenance-icon {
+                font-size: 3rem;
+            }
+        }
+
+    </style>
+</head>
+<body>
+    <!-- Floating Background Shapes -->
+    <div class="floating-shapes">
+        <div class="shape"></div>
+        <div class="shape"></div>
+        <div class="shape"></div>
+    </div>
+
+    <!-- Admin Notice (shown if user is admin) -->
+    <div class="admin-notice" id="adminNotice" style="display: none;">
+        <i class="fas fa-user-shield"></i>
+        <strong>Admin View:</strong> Site is in maintenance mode. Regular users see this page.
+    </div>
+
+    <div class="maintenance-container">
+        <div class="maintenance-icon">
+            <i class="fas fa-tools"></i>
+        </div>
+
+        <h1>Site Under Maintenance</h1>
+        
+        <p>
+            We're currently performing scheduled maintenance to improve your experience. 
+            Our team is working hard to get everything back online as soon as possible.
+        </p>
+
+        <!-- Estimated Return Time -->
+        <div class="countdown">
+            <h4><i class="fas fa-clock"></i> Estimated Return Time</h4>
+            <div class="countdown-timer" id="countdownTimer">
+                Calculating...
+            </div>
+        </div>
+
+        <!-- What We're Improving -->
+        <div class="features">
+            <div class="feature">
+                <i class="fas fa-rocket"></i>
+                <h3>Performance</h3>
+                <p>Upgrading server infrastructure for faster loading times</p>
+            </div>
+            
+            <div class="feature">
+                <i class="fas fa-shield-alt"></i>
+                <h3>Security</h3>
+                <p>Implementing enhanced security measures for your safety</p>
+            </div>
+            
+            <div class="feature">
+                <i class="fas fa-sparkles"></i>
+                <h3>New Features</h3>
+                <p>Adding exciting new features and improvements</p>
+            </div>
+        </div>
+
+        <!-- Contact Information -->
+        <div class="contact-info">
+            <h3>Need Immediate Assistance?</h3>
+            <div class="contact-links">
+                <a href="mailto:contact@velona.com" class="contact-link">
+                    <i class="fas fa-envelope"></i>
+                    Email Support
+                </a>
+                <a href="tel:+919876543210" class="contact-link">
+                    <i class="fas fa-phone"></i>
+                    Emergency Support
+                </a>
+                <a href="https://twitter.com/velona" class="contact-link" target="_blank">
+                    <i class="fab fa-twitter"></i>
+                    Follow Updates
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check if user is admin (simple check based on URL or session)
+        function checkAdminStatus() {
+            // You can enhance this check based on your admin detection logic
+            const urlParams = new URLSearchParams(window.location.search);
+            const isAdmin = urlParams.get('admin') === 'true' || 
+                           document.referrer.includes('/admin/') ||
+                           sessionStorage.getItem('admin_logged_in') === 'true';
+            
+            if (isAdmin) {
+                document.getElementById('adminNotice').style.display = 'block';
+            }
+        }
+
+        // Countdown timer (estimated 2 hours from now)
+        function startCountdown() {
+            const targetTime = new Date().getTime() + (2 * 60 * 60 * 1000); // 2 hours from now
+            
+            function updateCountdown() {
+                const now = new Date().getTime();
+                const distance = targetTime - now;
+                
+                if (distance < 0) {
+                    document.getElementById('countdownTimer').innerHTML = "Should be back online soon!";
+                    return;
+                }
+                
+                const hours = Math.floor(distance / (1000 * 60 * 60));
+                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+                
+                document.getElementById('countdownTimer').innerHTML = 
+                    `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+            
+            updateCountdown();
+            setInterval(updateCountdown, 1000);
+        }
+
+        // Auto-refresh every 5 minutes to check if maintenance is over
+        function setupAutoRefresh() {
+            setTimeout(() => {
+                // Only refresh if not admin
+                if (!document.getElementById('adminNotice').style.display.includes('block')) {
+                    window.location.reload();
+                }
+            }, 5 * 60 * 1000); // 5 minutes
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAdminStatus();
+            startCountdown();
+            setupAutoRefresh();
+        });
+    </script>
+</body>
+</html>

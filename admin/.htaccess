@@ -1,0 +1,4 @@
+# .htaccess (place inside /admin/ folder)
+
+# If URL is /admin/ then redirect to admin.php
+DirectoryIndex admin-login.php
