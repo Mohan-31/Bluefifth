@@ -324,6 +324,24 @@ $basePath = '/ecommerce-project/';
     </div>
 </div>
 
+<!-- Traditional Login / OTP Info Popup (shown to guests from any page) -->
+<div class="popup-modal m-auto" id="traditional-login-popup">
+    <button class="popup-close" onclick="closeAllPopups()">&times;</button>
+    <div class="popup-header">
+        <h3><i class="fas fa-sign-in-alt mr-2"></i>Login to Your Account</h3>
+    </div>
+    <div id="traditional-login-content" class="text-center" style="padding: 2rem;">
+        <div style="font-size: 48px; margin-bottom: 12px;">🛍️</div>
+        <h4 style="font-weight:700; color:#333; margin-bottom:8px;">No login needed to browse!</h4>
+        <p class="text-muted mb-4">Just add products to your cart and we'll verify your phone at checkout — fast and secure.</p>
+        <a href="/ecommerce-project/shop/category.php" class="btn btn-dark btn-block mb-3" onclick="closeAllPopups()">Continue Shopping</a>
+        <a href="/ecommerce-project/checkout.php" class="btn btn-outline-secondary btn-block" onclick="closeAllPopups()">Go to Checkout</a>
+        <div class="mt-4 pt-3 border-top">
+            <small class="text-muted">Your identity is verified via OTP at checkout</small>
+        </div>
+    </div>
+</div>
+
 <!-- Search Modal -->
 <div class="modal fade" id="searchModal" tabindex="-1" role="dialog">
     <div class="modal-dialog modal-lg" role="document">

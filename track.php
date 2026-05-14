@@ -2,7 +2,15 @@
 session_start();
 require_once 'includes/database.php';
 require_once 'includes/functions.php';
+require_once 'auth/session.php';
 
+$isLoggedIn    = isLoggedIn();
+$currentUser   = $isLoggedIn ? getCurrentUser() : null;
+$isLoggedIn    = $isLoggedIn && ($currentUser !== null);
+$userId        = $isLoggedIn ? $currentUser['id'] : null;
+$categories    = getAllCategories();
+$cartSummary   = $isLoggedIn ? getCartSummary($userId)   : ['item_count' => 0];
+$walletBalance = $isLoggedIn ? getWalletBalance($userId) : ['points' => 0, 'pending_points' => 0];
 $siteName    = getSetting('site_name', 'bluefifth');
 $currencySymbol = getSetting('currency_symbol', '₹');
 
@@ -170,11 +178,9 @@ $currentStep = $order ? statusToStep($order['status']) : 0;
   </style>
 </head>
 <body>
-<div class="track-wrap">
+<?php include './includes/navbar.php'; ?>
 
-  <a href="index.php" class="brand-link">
-    <img src="assets/images/logo2.jpg" alt="<?= htmlspecialchars($siteName) ?>">
-  </a>
+<div class="track-wrap nav-align">
 
   <!-- Lookup form -->
   <div class="card">

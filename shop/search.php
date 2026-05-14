@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // shop/search.php - Complete Dynamic Product Search Results Page
 session_start();
 require_once '../includes/database.php';
@@ -505,116 +505,9 @@ $seoDescription = "Search results for '" . htmlspecialchars($searchQuery) . "' -
     </style>
 </head>
 <body>
-    <!-- Navigation -->
-    <nav class="container-fluid shadow navbar navbar-expand-lg navbar-light nav-bg-light pt-3 pt-lg-5 flex-column sticky-top">
-        <!-- Top Row -->
-        <div class="w-100 d-flex justify-content-between align-items-center">
-            <button class="navbar-toggler border-menu" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
-            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-            <i class="fa-solid fa-bars fa-xl" style="color: #000000;"></i>
-          </button>
-      
-          <div class="d-flex align-items-center ">
-            <i class="fa-solid fa-magnifying-glass fa-xl d-none d-lg-block" style="color: #000000;" onclick="toggleSearch()"></i>
-          </div>
+    <?php include '../includes/navbar.php'; ?>
 
-          <div class="text-center">
-            <a class="navbar-brand mx-auto" href="../index.php">
-              <img src="../assets/images/logo.png" class="mb-1" alt="Velona" width="180px">
-            </a>
-          </div>
-
-          <div class="d-flex align-items-center d-lg-none d-block">
-            <i class="fa-solid fa-magnifying-glass fa-xl " style="color: #000000;" onclick="toggleSearch()"></i>
-          </div>
-
-          <div class="d-flex align-items-center">
-            <?php if ($isLoggedIn): ?>
-                <i class="fa-solid fa-wallet fa-xl mr-4 mt-1" style="color: #000000;" title="Wallet: <?= formatProductPrice($walletBalance['points'] + $walletBalance['pending_points']) ?>"></i>
-                <i class="fa-regular fa-user fa-xl mr-4 d-none d-lg-block" style="color: #000000;" onclick="toggleUserMenu()" title="<?= htmlspecialchars($currentUser['name']) ?>"></i>
-            <?php else: ?>
-                <i class="fa-solid fa-wallet fa-xl mr-4 mt-1" style="color: #000000;"></i>
-                <i class="fa-regular fa-user fa-xl mr-4 d-none d-lg-block" style="color: #000000;" onclick="initGoogleSignIn()"></i>
-            <?php endif; ?>
-            <a href="cart.php" class="position-relative">
-                <i class="fa-solid fa-bag-shopping fa-xl" style="color: #000000;"></i>
-                <?php if ($cartSummary['item_count'] > 0): ?>
-                    <span class="position-absolute badge badge-danger" style="top: -8px; right: -8px; font-size: 0.7rem;" id="cartBadge">
-                        <?= $cartSummary['item_count'] ?>
-                    </span>
-                <?php endif; ?>
-            </a>
-          </div>
-        </div>
-      
-        <!-- Bottom Row -->
-        <div class="w-100 mt-3">
-          <div class="collapse navbar-collapse justify-content-between" id="navbarSupportedContent">
-            <ul class="navbar-nav m-auto">
-              <li class="nav-item active">
-                <a class="nav-link nav-link-st" href="../index.php">HOME <span class="sr-only">(current)</span></a>
-              </li>
-              
-              <!-- Dynamic Categories -->
-              <?php foreach ($categories as $cat): ?>
-                  <li class="nav-item active">
-                    <a class="nav-link nav-link-st" href="category.php?category=<?= urlencode($cat['slug']) ?>">
-                        <?= strtoupper(htmlspecialchars($cat['name'])) ?>
-                    </a>
-                  </li>
-              <?php endforeach; ?>
-              
-              <li class="nav-item active">
-                <a class="nav-link nav-link-st" href="../about.php">ABOUT US</a>
-              </li>
-              
-              <?php if ($isLoggedIn): ?>
-                  <li class="nav-item active mt-4 mb-4 d-lg-none d-block">
-                    <div class="nav-link">
-                        <i class="fa-regular fa-user fa-xl mr-3"></i>
-                        <span class="nav-log"><?= htmlspecialchars($currentUser['name']) ?></span>
-                        <br><small>Wallet: <?= formatProductPrice($walletBalance['points'] + $walletBalance['pending_points']) ?></small>
-                    </div>
-                  </li>
-              <?php else: ?>
-                  <li class="nav-item active mt-4 mb-4 d-lg-none d-block">
-                    <a href="#" class="nav-link" onclick="initGoogleSignIn()">
-                        <i class="fa-regular fa-user fa-xl mr-3"></i>
-                        <span class="nav-log">Log in</span>
-                    </a>
-                  </li>
-              <?php endif; ?>
-            </ul>
-        </div>
-      </div>
-    </nav>
-
-    <!-- Search Modal -->
-    <div class="modal fade" id="searchModal" tabindex="-1" role="dialog">
-        <div class="modal-dialog modal-lg" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Search Products</h5>
-                    <button type="button" class="close" data-dismiss="modal">
-                        <span>&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <div class="input-group mb-3">
-                        <input type="text" class="form-control" id="searchInput" placeholder="Search for products..." value="<?= htmlspecialchars($searchQuery) ?>" onkeypress="handleSearchKeypress(event)">
-                        <div class="input-group-append">
-                            <button class="btn btn-primary" type="button" onclick="performNewSearch()">
-                                <i class="fas fa-search"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div id="searchResults"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Search Header -->
+<!-- Search Header -->
     <div class="search-header">
         <div class="container">
             <div class="row">

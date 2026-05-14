@@ -1278,7 +1278,17 @@ function showGuestOrderLookup() {
     </style>
 </head>
 <body>
-    <div class="container orders-container p-3 ">
+
+<?php
+// Navbar variables
+$currentUser   = $isLoggedIn ? getUserById($userId) : null;
+$categories    = getAllCategories();
+$cartSummary   = $isLoggedIn ? getCartSummary($userId)   : ['item_count' => 0];
+$walletBalance = $isLoggedIn ? getWalletBalance($userId) : ['points' => 0, 'pending_points' => 0];
+?>
+<?php include '../includes/navbar.php'; ?>
+
+    <div class="container orders-container p-3 nav-align">
         <!-- Page Header -->
         <div class="page-header">
             <h1 class="page-title">My Orders</h1>
