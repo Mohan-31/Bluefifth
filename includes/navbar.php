@@ -48,6 +48,15 @@ $basePath = '/ecommerce-project/';
             color: grey !important;
             font-weight: 550 !important;
         }
+        /* Scroll-hide / scroll-reveal animation */
+        #main-navbar {
+            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: transform;
+        }
+        #main-navbar.navbar-hidden {
+            transform: translateY(-100%);
+        }
+
         /* Mobile Menu Scrollable */
         @media (max-width: 991.98px) { /* applies to devices < lg */
             .navbar-collapse {
@@ -75,7 +84,7 @@ $basePath = '/ecommerce-project/';
 </div>
 
 <!-- Navigation Bar - UNIFIED Shopping + Referral -->
-<div class="container-fluid shadow fixed-top" style="background:#FFFFFF; margin-top:48px;">
+<div id="main-navbar" class="container-fluid shadow fixed-top" style="background:#FFFFFF; margin-top:48px;">
     <nav class="container navbar navbar-expand-lg navbar-light nav-bg-light pt-3 pt-lg-4 flex-column sticky-top">
         <!-- Top Row -->
         <div class="w-100 d-flex justify-content-between align-items-center">
@@ -580,4 +589,48 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 console.log('🔍 Navbar search functionality loaded');
+
+// ============================================================================
+// SCROLL-HIDE / SCROLL-REVEAL NAVBAR
+// ============================================================================
+(function () {
+    var navbar   = document.getElementById('main-navbar');
+    var lastY    = 0;
+    var ticking  = false;
+
+    function update() {
+        var y = window.scrollY || window.pageYOffset;
+
+        if (y < 80) {
+            // Near top — always visible
+            navbar.classList.remove('navbar-hidden');
+        } else if (y > lastY) {
+            // Scrolling down → hide
+            navbar.classList.add('navbar-hidden');
+        } else {
+            // Scrolling up → show
+            navbar.classList.remove('navbar-hidden');
+        }
+
+        lastY    = y;
+        ticking  = false;
+    }
+
+    window.addEventListener('scroll', function () {
+        if (!ticking) {
+            requestAnimationFrame(update);
+            ticking = true;
+        }
+    }, { passive: true });
+
+    // Always reveal navbar when mobile menu opens
+    document.addEventListener('DOMContentLoaded', function () {
+        var collapseEl = document.getElementById('navbarSupportedContent');
+        if (collapseEl) {
+            $(collapseEl).on('show.bs.collapse', function () {
+                navbar.classList.remove('navbar-hidden');
+            });
+        }
+    });
+}());
 </script>
