@@ -6,14 +6,13 @@ require_once '../auth/session.php';
 // Check if user is logged in
 $isLoggedIn = isLoggedIn();
 $currentUser = $isLoggedIn ? getCurrentUser() : null;
+$isLoggedIn  = $isLoggedIn && ($currentUser !== null);
 
 // Get all categories for navigation
 $categories = getAllCategories();
 
 // Get user's cart summary if logged in
-$cartSummary = $isLoggedIn ? getCartSummary($currentUser['id']) : ['item_count' => 0];
-
-// Get wallet balance if logged in
+$cartSummary  = $isLoggedIn ? getCartSummary($currentUser['id'])   : ['item_count' => 0];
 $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' => 0, 'pending_points' => 0];
 
 // Set site name for navbar

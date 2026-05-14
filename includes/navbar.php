@@ -13,14 +13,7 @@ $cartSummary = $cartSummary ?? ['item_count' => 0];
 $walletBalance = $walletBalance ?? ['points' => 0, 'pending_points' => 0];
 $siteName = $siteName ?? 'Bluefifth';
 
-// Determine the correct path to assets based on current directory
-$basePath = '';
-$currentDir = basename(dirname($_SERVER['PHP_SELF']));
-if ($currentDir === 'shop') {
-    $basePath = '../';
-} else {
-    $basePath = './';
-}
+$basePath = '/ecommerce-project/';
 
 ?>
 <style>
@@ -96,8 +89,8 @@ if ($currentDir === 'shop') {
             </div>
 
             <div class="text-center ">
-                <a class="navbar-brand mx-auto " href="../index.php">
-                    <img src="../assets/images/logo.jpg" class="mb-1  img-responsive" alt="<?= htmlspecialchars($siteName) ?>" >
+                <a class="navbar-brand mx-auto " href="/ecommerce-project/index.php">
+                    <img src="/ecommerce-project/assets/images/logo.jpg" class="mb-1  img-responsive" alt="<?= htmlspecialchars($siteName) ?>" >
                 </a>
             </div>
 
@@ -116,11 +109,11 @@ if ($currentDir === 'shop') {
                            data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"></i>
                         <div class="dropdown-menu dropdown-menu-right">
                             <div class="dropdown-header">
-                                <strong><?= htmlspecialchars($currentUser['name']) ?></strong>
-                                <br><small class="text-muted"><?= htmlspecialchars($currentUser['email']) ?></small>
+                                <strong><?= htmlspecialchars($currentUser['name'] ?? '') ?></strong>
+                                <br><small class="text-muted"><?= htmlspecialchars($currentUser['email'] ?? '') ?></small>
                             </div>
                             <div class="dropdown-divider"></div>
-                            <a class="dropdown-item" href="../profile.php" onclick="">
+                            <a class="dropdown-item" href="/ecommerce-project/profile.php">
                                 <i class="fas fa-user mr-2"></i>My Profile
                             </a>
                             <a class="dropdown-item" href="javascript:void(0)" onclick="showReferralPopup()">
@@ -129,7 +122,7 @@ if ($currentDir === 'shop') {
                             <a class="dropdown-item" href="javascript:void(0)" onclick="showWalletPopup()">
                                 <i class="fas fa-wallet mr-2"></i>My Wallet
                             </a>
-                            <a class="dropdown-item" href="../account/orders.php">
+                            <a class="dropdown-item" href="/ecommerce-project/account/orders.php">
                                 <i class="fas fa-shopping-bag mr-2"></i>My Orders
                             </a>
                             <div class="dropdown-divider"></div>
@@ -155,7 +148,7 @@ if ($currentDir === 'shop') {
                             <a class="dropdown-item" href="javascript:void(0)" onclick="showWalletPopup()">
                                 <i class="fas fa-wallet mr-2"></i>My Wallet
                             </a>
-                            <a class="dropdown-item" href="../account/orders.php">
+                            <a class="dropdown-item" href="/ecommerce-project/account/orders.php">
                                 <i class="fas fa-shopping-bag mr-2"></i>My Orders
                             </a>
                             <div class="dropdown-divider"></div>
@@ -171,7 +164,7 @@ if ($currentDir === 'shop') {
                 <i class="fa-solid fa-magnifying-glass fa-xl" style="color: #000000; cursor: pointer;" onclick="toggleSearch()"></i>
             </div>
                 <!-- Shopping Cart -->
-                <a href="../shop/cart.php" class="position-relative ">
+                <a href="/ecommerce-project/shop/cart.php" class="position-relative ">
                     <i class="fa-solid fa-cart-shopping fa-xl" style="color: #000000; "></i>
                     <?php if ($cartSummary['item_count'] > 0): ?>
                         <span class="position-absolute badge badge-danger" style="top: -8px; right: -8px; font-size: 0.7rem;">
@@ -187,7 +180,7 @@ if ($currentDir === 'shop') {
             <div class="collapse navbar-collapse justify-content-between" id="navbarSupportedContent">
                 <ul class="navbar-nav m-auto">
                     <li class="nav-item ">
-                        <a class="nav-link nav-link-st" href="../index.php">HOME</a>
+                        <a class="nav-link nav-link-st" href="/ecommerce-project/index.php">HOME</a>
                     </li>
                     
                     <!-- Dynamic Categories -->
@@ -202,31 +195,31 @@ if ($currentDir === 'shop') {
                             $isActive = ($current_page == 'category.php' && $current_category == $category['slug']);
                         ?>
                         <li class="nav-item">
-                            <a class="nav-link nav-link-st <?= $isActive ? 'active' : '' ?>" 
-                               href="../shop/category.php?category=<?= urlencode($category['slug']) ?>">
+                            <a class="nav-link nav-link-st <?= $isActive ? 'active' : '' ?>"
+                               href="/ecommerce-project/shop/category.php?category=<?= urlencode($category['slug']) ?>">
                                 <?= strtoupper(htmlspecialchars($category['name'])) ?>
                             </a>
                         </li>
                     <?php endforeach; ?>
                     
                     <li class="nav-item">
-                        <a class="nav-link nav-link-st" href="../includes/blog.php">BLOG</a>
+                        <a class="nav-link nav-link-st" href="/ecommerce-project/includes/blog.php">BLOG</a>
                     </li>
-                    
+
                     <li class="nav-item">
-                        <a class="nav-link nav-link-st" href="../includes/about.php">ABOUT US</a>
+                        <a class="nav-link nav-link-st" href="/ecommerce-project/includes/about.php">ABOUT US</a>
                     </li>
                     
                     <!-- Mobile User Menu -->
                     <?php if ($isLoggedIn): ?>
                         <li class="nav-item mt-4 mb-4 d-lg-none d-block">
                             <div class="nav-link">
-                                <strong><?= htmlspecialchars($currentUser['name']) ?></strong>
+                                <strong><?= htmlspecialchars($currentUser['name'] ?? '') ?></strong>
                                 <br><small>Wallet: ₹<?= number_format($walletBalance['points'] + $walletBalance['pending_points']) ?></small>
                             </div>
                         </li>
                         <li class="nav-item d-lg-none d-block">
-                            <a href="../profile.php" onclick="" class="nav-link">
+                            <a href="/ecommerce-project/profile.php" class="nav-link">
                                 <i class="fa-regular fa-chart-line mr-2"></i>My Profile
                             </a>
                         </li>
@@ -241,7 +234,7 @@ if ($currentDir === 'shop') {
                             </a>
                         </li>
                         <li class="nav-item d-lg-none d-block">
-                            <a href="../account/orders.php" class="nav-link">
+                            <a href="/ecommerce-project/account/orders.php" class="nav-link">
                                 <i class="fa-regular fa-shopping-bag mr-2"></i>My Orders
                             </a>
                         </li>
@@ -268,7 +261,7 @@ if ($currentDir === 'shop') {
                             </a>
                         </li>
                         <li class="nav-item d-lg-none d-block">
-                            <a href="../account/orders.php" class="nav-link">
+                            <a href="/ecommerce-project/account/orders.php" class="nav-link">
                                 <i class="fa-regular fa-shopping-bag mr-2"></i>My Orders
                             </a>
                         </li>
@@ -387,13 +380,7 @@ async function performSearch() {
         const currentUrl = window.location.href;
         let apiPath;
         
-        if (currentUrl.includes('/shop/')) {
-            // We're in a shop page (category.php, cart.php, product.php)
-            apiPath = 'api/search.php';
-        } else {
-            // We're in root (index.php, about.php, etc.)
-            apiPath = 'shop/api/search.php';
-        }
+        apiPath = '/ecommerce-project/shop/api/search.php';
         
         console.log('🔍 Search from:', currentUrl);
         console.log('🔍 Using API path:', apiPath);
@@ -438,24 +425,8 @@ function displaySearchResults(products) {
         return;
     }
 
-    // FIXED: Correct path detection for product links
-    const currentPath = window.location.pathname;
-    let productBasePath;
-    let imageBasePath;
-    
-    if (currentPath === '/' || currentPath.endsWith('/index.php') || currentPath.endsWith('/')) {
-        // For index.php (root)
-        productBasePath = 'shop/';
-        imageBasePath = '';
-    } else if (currentPath.includes('/shop/')) {
-        // For pages inside /shop/ folder
-        productBasePath = '';
-        imageBasePath = '../';
-    } else {
-        // For other pages
-        productBasePath = 'shop/';
-        imageBasePath = '';
-    }
+    const productBasePath = '/ecommerce-project/shop/';
+    const imageBasePath = '/ecommerce-project/';
 
     let html = '<div class="row">';
     products.forEach(product => {
@@ -511,11 +482,7 @@ async function subscribeNewsletter(event) {
         const currentUrl = window.location.href;
         let apiPath;
         
-        if (currentUrl.includes('/shop/')) {
-            apiPath = '../api/newsletter.php';
-        } else {
-            apiPath = 'api/newsletter.php';
-        }
+        apiPath = '/ecommerce-project/api/newsletter.php';
         
         const response = await fetch(apiPath, {
             method: 'POST',

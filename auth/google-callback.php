@@ -1,4 +1,10 @@
 <?php
+// Google OAuth has been replaced by phone-OTP checkout. This file is disabled.
+http_response_code(410);
+header('Content-Type: application/json');
+echo json_encode(['success' => false, 'message' => 'Google Sign-In is no longer supported. Please use phone verification at checkout.']);
+exit;
+
 // auth/google-callback.php - COMPLETE Enhanced with Welcome Email System
 session_start();
 

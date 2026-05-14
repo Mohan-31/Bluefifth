@@ -24,6 +24,7 @@ if (empty($searchQuery)) {
 // Check if user is logged in
 $isLoggedIn = isLoggedIn();
 $currentUser = $isLoggedIn ? getCurrentUser() : null;
+$isLoggedIn  = $isLoggedIn && ($currentUser !== null);
 
 // Get all categories for navigation and filtering
 $categories = getAllCategories();

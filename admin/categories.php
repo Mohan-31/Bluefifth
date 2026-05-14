@@ -204,9 +204,9 @@ requireAdminAuth();
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>
-                        <img src="${category.image || '/uploads/categories/default.jpg'}" 
+                        <img src="${category.image || '/ecommerce-project/uploads/categories/default.jpg'}"
                             alt="${category.name}" class="category-image"
-                            onerror="this.src='/uploads/categories/default.jpg'">
+                            onerror="this.src='/ecommerce-project/uploads/categories/default.jpg'">
                     </td>
                     <td>
                         <div class="fw-bold">${category.name}</div>

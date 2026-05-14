@@ -11,10 +11,11 @@ try {
     $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 
 } catch(PDOException $e) {
-    die("Connection failed: " . $e->getMessage());
+    // Do not expose PDO error messages to the browser in production.
+    error_log("Database connection error: " . $e->getMessage());
+    die(json_encode(['success' => false, 'message' => 'Database unavailable']));
 }
 
-/* THIS PART IS MISSING */
 function getConnection() {
     global $conn;
     return $conn;

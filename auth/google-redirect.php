@@ -1,4 +1,10 @@
 <?php
+// Google OAuth has been replaced by phone-OTP checkout. This file is disabled.
+http_response_code(410);
+header('Content-Type: application/json');
+echo json_encode(['success' => false, 'message' => 'Google Sign-In is no longer supported. Please use phone verification at checkout.']);
+exit;
+
 // auth/google-redirect.php - Handle Google OAuth callback
 session_start();
 
@@ -20,7 +26,7 @@ if (isset($_GET['code']) && isset($_GET['state'])) {
         'client_secret' => GOOGLE_CLIENT_SECRET,
         'code' => $code,
         'grant_type' => 'authorization_code',
-        'redirect_uri' => 'http://localhost/referral-system/auth/google-redirect.php'
+        'redirect_uri' => 'http://localhost/ecommerce-project/auth/google-redirect.php'
     ];
     
     $context = stream_context_create([
@@ -98,7 +104,7 @@ if (isset($_GET['code']) && isset($_GET['state'])) {
                         window.close();
                     } else {
                         // Direct redirect
-                        window.location.href = '/referral-system/index.php';
+                        window.location.href = '/ecommerce-project/index.php';
                     }
                 </script>
                 <p>Login successful! Redirecting...</p>
@@ -112,7 +118,7 @@ if (isset($_GET['code']) && isset($_GET['state'])) {
                         window.close();
                     } else {
                         alert('Login failed: Database error');
-                        window.location.href = '/referral-system/index.php';
+                        window.location.href = '/ecommerce-project/index.php';
                     }
                 </script>
                 ";
@@ -125,7 +131,7 @@ if (isset($_GET['code']) && isset($_GET['state'])) {
                     window.close();
                 } else {
                     alert('Login failed: Invalid user data');
-                    window.location.href = '/referral-system/index.php';
+                    window.location.href = '/ecommerce-project/index.php';
                 }
             </script>
             ";
@@ -138,7 +144,7 @@ if (isset($_GET['code']) && isset($_GET['state'])) {
                 window.close();
             } else {
                 alert('Login failed: No access token');
-                window.location.href = '/referral-system/index.php';
+                window.location.href = '/ecommerce-project/index.php';
             }
         </script>
         ";
@@ -152,7 +158,7 @@ if (isset($_GET['code']) && isset($_GET['state'])) {
             window.close();
         } else {
             alert('Login cancelled or failed');
-            window.location.href = '/referral-system/index.php';
+            window.location.href = '/ecommerce-project/index.php';
         }
     </script>
     ";
@@ -163,7 +169,7 @@ if (isset($_GET['code']) && isset($_GET['state'])) {
         if (window.opener) {
             window.close();
         } else {
-            window.location.href = '/referral-system/index.php';
+            window.location.href = '/ecommerce-project/index.php';
         }
     </script>
     ";

@@ -291,15 +291,15 @@ if (!$isLoggedIn && isset($_POST['lookup_email'])) {
     }
 }
 
+// Get dynamic settings (must be before showGuestOrderLookup which uses $siteName)
+$siteName = getSetting('site_name', 'Bluefifth');
+
 // Handle both logged-in users and guest order lookup
 if (!$isLoggedIn && empty($_POST['lookup_email']) && empty($guestLookupOrders)) {
     // Show guest lookup form instead of redirecting
     showGuestOrderLookup();
     exit;
 }
-
-// Get dynamic settings
-$siteName = getSetting('site_name', 'VELONA');
 $currency = getSetting('currency', 'INR');
 $currencySymbol = getSetting('currency_symbol', '₹');
 
@@ -612,7 +612,7 @@ function showGuestOrderLookup() {
 <!doctype html>
 <html lang="en">
 <head>
-    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://kit.fontawesome.com/4358befd66.js" crossorigin="anonymous"></script>
     <meta charset="utf-8">

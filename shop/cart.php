@@ -10,13 +10,10 @@ require_once '../includes/functions.php';
 require_once '../auth/session.php';
 require_once '../includes/referral-tracker.php';
 
-error_log("=== CART PAGE DEBUG ===");
-error_log("Is logged in: " . (isLoggedIn() ? 'YES' : 'NO'));
-error_log("Session guest cart: " . print_r($_SESSION['guest_cart'] ?? [], true));
-
 // Check if user is logged in
 $isLoggedIn = isLoggedIn();
 $currentUser = $isLoggedIn ? getCurrentUser() : null;
+$isLoggedIn  = $isLoggedIn && ($currentUser !== null);
 
 // Get cart items
 $cartItems = [];
@@ -24,18 +21,13 @@ $cartSummary = ['item_count' => 0, 'total_quantity' => 0, 'total_amount' => 0];
 
 if ($isLoggedIn) {
     // Get user cart from database
-    error_log("Loading cart for logged in user ID: " . $currentUser['id']);
     $cartItems = getCartItems($currentUser['id']);
     $cartSummary = getCartSummary($currentUser['id']);
 } else {
     // Get guest cart from session
-    error_log("Loading guest cart from session");
-    $cartItems = getSessionCartItems();
+        $cartItems = getSessionCartItems();
     $cartSummary = getSessionCartSummary();
 }
-
-error_log("Final cart items in cart.php: " . print_r($cartItems, true));
-error_log("Final cart summary: " . print_r($cartSummary, true));
 
 // Get all categories for navigation
 $categories = getAllCategories();
@@ -43,21 +35,15 @@ $categories = getAllCategories();
 // Get wallet balance if logged in (for display only, not usage)
 $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' => 0, 'pending_points' => 0];
 
-// Get cart summary with combo pricing
-if ($isLoggedIn) {
-    $cartSummary = getCartSummaryWithCombo($currentUser['id']);
-} else {
-    $cartSummary = getSessionCartSummaryWithCombo();
-}
+$totalAmount = $cartSummary['total_amount'] ?? 0;
 
-// Calculate shipping based on combo price
 $shippingCost = 0;
-$freeShippingThreshold = getSetting('free_shipping_threshold', 1000);
-if ($cartSummary['total'] > 0 && $cartSummary['total'] < $freeShippingThreshold) {
+$freeShippingThreshold = (float) getSetting('free_shipping_threshold', 1000);
+if ($totalAmount > 0 && $totalAmount < $freeShippingThreshold) {
     $shippingCost = 50;
 }
 
-$finalTotal = $cartSummary['total'] + $shippingCost;
+$finalTotal = $totalAmount + $shippingCost;
 ?>
 <!doctype html>
 <html lang="en">
@@ -731,59 +717,6 @@ $finalTotal = $cartSummary['total'] + $shippingCost;
                         </div>
                     <?php endif; ?>
                     
-                    <?php if ($isComboApplied): ?>
-                      <!-- Combo Offer Applied -->
-                      <div class="mb-3 p-3" style="background: linear-gradient(135deg, #28a745, #20c997); color: white; border-radius: 8px;">
-                        <div class="d-flex justify-content-between align-items-center">
-                          <div>
-                            <h6 class="mb-1">🎉 Combo Offer Applied!</h6>
-                            <?php if ($cartSummary['combo_type'] == '3_for_1199'): ?>
-                              <small>3 Products for ₹1199</small>
-                            <?php else: ?>
-                              <small>5 Products for ₹1699</small>
-                            <?php endif; ?>
-                          </div>
-                          <div class="text-right">
-                            <div style="text-decoration: line-through; font-size: 12px;">₹<?= number_format($cartSummary['regular_total'], 2) ?></div>
-                            <div style="font-weight: 600;">You saved ₹<?= number_format($comboSavings, 2) ?>!</div>
-                          </div>
-                        </div>
-                      </div>
-                      <?php endif; ?>
-                    
-                    <!-- Combo Offer Section -->
-                    <?php if ($cartSummary['is_combo'] || in_array($cartSummary['item_count'], [1, 2, 4])): ?>
-                        <div class="combo-offer-section mb-4">
-                            <?php if ($cartSummary['is_combo']): ?>
-                                <!-- Active Combo Offer -->
-                                <div class="alert alert-success">
-                                    <h5 class="mb-2">🎉 Combo Offer Applied!</h5>
-                                    <?php if ($cartSummary['combo_type'] == '3_for_1199'): ?>
-                                        <p class="mb-1">3 Products for ₹1199</p>
-                                    <?php else: ?>
-                                        <p class="mb-1">5 Products for ₹1699</p>
-                                    <?php endif; ?>
-                                    <small class="text-success">You saved ₹<?= number_format($cartSummary['savings'], 2) ?>!</small>
-                                </div>
-                            <?php else: ?>
-                                <!-- Combo Offer Reminder -->
-                                <div class="alert alert-warning">
-                                    <h6 class="mb-2">💡 Special Combo Offers Available!</h6>
-                                    <ul class="mb-2" style="padding-left: 20px;">
-                                        <li>Buy 3 products for ₹1199</li>
-                                        <li>Buy 5 products for ₹1699</li>
-                                    </ul>
-                                    <?php 
-                                    $reminderMsg = getComboReminderMessage($cartSummary['item_count']);
-                                    if ($reminderMsg): 
-                                    ?>
-                                        <small class="text-warning"><?= $reminderMsg ?></small>
-                                    <?php endif; ?>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                    <?php endif; ?>
-
                     <div class="cart-items">
                     <?php foreach ($cartItems as $item): ?>
                         <div class="cart-card" data-cart-id="<?= $isLoggedIn ? $item['id'] : $item['cart_key'] ?>" data-product-id="<?= $item['product_id'] ?>">
@@ -830,16 +763,9 @@ $finalTotal = $cartSummary['total'] + $shippingCost;
                         <h5 class="summary-title">Order summary</h5>
                         
                         <div class="order-summary-line mt-4">
-                        <span>Subtotal (<?= array_sum(array_column($cartItems, 'quantity')) ?> items)</span>
-                        <span>
-                          <?php if ($isComboApplied): ?>
-                            <span style="text-decoration: line-through; color: #999; font-size: 12px;">₹<?= number_format($cartSummary['regular_total'], 2) ?></span><br>
-                            <span style="color: #28a745; font-weight: 600;">₹<?= number_format($totalAmount, 2) ?></span>
-                          <?php else: ?>
-                            ₹<?= number_format($totalAmount, 2) ?>
-                          <?php endif; ?>
-                        </span>
-                      </div>
+                            <span id="subtotalCount">Subtotal (<?= array_sum(array_column($cartItems, 'quantity')) ?> items)</span>
+                            <span id="subtotalAmount">₹<?= number_format($totalAmount, 2) ?></span>
+                        </div>
                         
                         <div class="summary-line">
                             <span>Shipping</span>
@@ -856,19 +782,9 @@ $finalTotal = $cartSummary['total'] + $shippingCost;
                         <p class="note">Taxes included. Discounts calculated at checkout.</p>
                         
                         <?php if ($isLoggedIn): ?>
-                        <div class="w-100">
-                            <?php if (in_array($cartSummary['item_count'], [1, 2, 4])): ?>
-                                <button class="checkout-btn text-decoration-none w-100" onclick="showComboReminderPopup()">Check out</button>
-                            <?php else: ?>
-                                <a href="../checkout.php"><button class="checkout-btn text-decoration-none w-100">Check out</button></a>
-                            <?php endif; ?>
-                        </div>
+                            <a href="../checkout.php"><button class="checkout-btn text-decoration-none w-100">Check out</button></a>
                         <?php else: ?>
-                            <?php if (in_array($cartSummary['item_count'], [1, 2, 4])): ?>
-                                <button class="checkout-btn w-100" onclick="showComboReminderPopup()">Check out</button>
-                            <?php else: ?>
-                                <button class="checkout-btn w-100" onclick="proceedToCheckout()">Check out</button>
-                            <?php endif; ?>
+                            <button class="checkout-btn w-100" onclick="proceedToCheckout()">Check out</button>
                         <?php endif; ?>
                         
                         <!-- Clear Cart Button -->
@@ -2026,13 +1942,8 @@ function shareLinkViaWebShare() {
                 const data = await response.json();
                 
                 if (data.success) {
-                    // Update quantity input
                     quantityInput.value = newQuantity;
-                    
-                    // Recalculate totals
                     await refreshCartTotals();
-                    
-                    showNotification('Cart updated successfully', 'success');
                 } else {
                     showNotification(data.message || 'Failed to update cart', 'error');
                 }
@@ -2076,11 +1987,8 @@ function shareLinkViaWebShare() {
                         return;
                     }
                     
-                    // Update cart summary
                     await refreshCartTotals();
                     updateCartBadge(data.cart_summary?.item_count || 0);
-                    
-                    showNotification('Item removed from cart', 'success');
                 } else {
                     showNotification(data.message || 'Failed to remove item', 'error');
                 }
@@ -2133,23 +2041,11 @@ function shareLinkViaWebShare() {
                     document.getElementById('subtotalAmount').textContent = `₹${summary.total_amount.toFixed(2)}`;
                     document.getElementById('shippingAmount').textContent = shippingCost > 0 ? `₹${shippingCost.toFixed(2)}` : 'FREE';
                     document.getElementById('totalAmount').textContent = `₹${finalTotal.toFixed(2)} INR`;
-                    
-                    // Update item count in summary
-                    document.querySelector('.summary-line:first-child span:first-child').textContent = `Subtotal (${summary.item_count} items)`;
-                    
-                    // Update free shipping progress
+
+                    const subtotalCount = document.getElementById('subtotalCount');
+                    if (subtotalCount) subtotalCount.textContent = `Subtotal (${summary.item_count} items)`;
+
                     updateFreeShippingProgress(summary.total_amount);
-                    
-                    // Update individual item totals
-                    const rows = document.querySelectorAll('#cartTableBody tr');
-                    rows.forEach(row => {
-                        const productId = row.dataset.productId;
-                        const quantity = parseInt(row.querySelector('.quantity-input').value);
-                        const priceText = row.querySelector('.product-variant:last-child').textContent;
-                        const price = parseFloat(priceText.replace('₹', '').replace(',', ''));
-                        const itemTotal = quantity * price;
-                        row.querySelector('.item-total').textContent = `₹${itemTotal.toFixed(2)}`;
-                    });
                 }
             } catch (error) {
                 console.error('Error refreshing cart totals:', error);
@@ -2492,171 +2388,7 @@ function shareLinkViaWebShare() {
             }, 300000); // Check every 5 minutes
         <?php endif; ?>
         
-        // Combo offer handling
-        let comboReminderDismissed = false;
-        
-        // Combo offer handling with persistent dismissal state
-        function showComboReminderPopup() {
-            // Check if user has already dismissed the popup for this session
-            const dismissalKey = 'combo_reminder_dismissed_' + <?= $cartSummary['item_count'] ?>;
-            const isDismissed = sessionStorage.getItem(dismissalKey) === 'true';
-            
-            if (isDismissed) {
-                // If user already dismissed the popup, proceed to checkout directly
-                proceedToCheckoutDirectly();
-                return;
-            }
-            
-            const itemCount = <?= $cartSummary['item_count'] ?>;
-            const message = "<?= addslashes(getComboReminderMessage($cartSummary['item_count'])) ?>";
-            
-            document.getElementById('comboReminderMessage').textContent = message;
-            $('#comboReminderModal').modal('show');
-        }
-        
-        function setComboReminderDismissed() {
-            // Store dismissal state in sessionStorage with item count specific key
-            const dismissalKey = 'combo_reminder_dismissed_' + <?= $cartSummary['item_count'] ?>;
-            sessionStorage.setItem(dismissalKey, 'true');
-            $('#comboReminderModal').modal('hide');
-        }
-        
-        function continueShopping() {
-            $('#comboReminderModal').modal('hide');
-            window.location.href = '../index.php';
-        }
-        
-        function continueCheckout() {
-            // Set dismissal state and proceed to checkout
-            const dismissalKey = 'combo_reminder_dismissed_' + <?= $cartSummary['item_count'] ?>;
-            sessionStorage.setItem(dismissalKey, 'true');
-            $('#comboReminderModal').modal('hide');
-            
-            proceedToCheckoutDirectly();
-        }
-        
-        function proceedToCheckoutDirectly() {
-            if (<?= $isLoggedIn ? 'true' : 'false' ?>) {
-                window.location.href = '../checkout.php';
-            } else {
-                // For guests, trigger the existing proceedToCheckout function
-                proceedToCheckout();
-            }
-        }
-        
-        // Clear dismissal state when cart items change (optional - for better UX)
-        function clearComboReminderState() {
-            // Clear all combo reminder dismissal states
-            Object.keys(sessionStorage).forEach(key => {
-                if (key.startsWith('combo_reminder_dismissed_')) {
-                    sessionStorage.removeItem(key);
-                }
-            });
-        }
-        // Update refreshCartTotals function to handle combo pricing
-        async function refreshCartTotals() {
-            try {
-                const response = await fetch('api/cart.php?action=get_cart_summary');
-                const data = await response.json();
-                
-                if (data.success) {
-                    const summary = data.cart_summary;
-                    
-                    // Apply combo pricing calculation
-                    const comboResult = calculateComboPrice(summary.item_count, summary.total_amount);
-                    const finalAmount = comboResult.total;
-                    
-                    const shippingCost = finalAmount >= 1000 ? 0 : 50;
-                    const finalTotal = finalAmount + shippingCost;
-                    
-                    // Update summary display with combo pricing
-                    const subtotalElement = document.getElementById('subtotalAmount');
-                    if (comboResult.is_combo) {
-                        subtotalElement.innerHTML = `
-                            <span style="text-decoration: line-through; color: #999; font-size: 12px;">₹${summary.total_amount.toFixed(2)}</span><br>
-                            <span style="color: #28a745; font-weight: 600;">₹${finalAmount.toFixed(2)}</span>
-                            <small style="color: #28a745; display: block; font-size: 11px;">Combo Price!</small>
-                        `;
-                    } else {
-                        subtotalElement.textContent = `₹${finalAmount.toFixed(2)}`;
-                    }
-                    
-                    document.getElementById('shippingAmount').textContent = shippingCost > 0 ? `₹${shippingCost.toFixed(2)}` : 'FREE';
-                    document.getElementById('totalAmount').textContent = `₹${finalTotal.toFixed(2)} INR`;
-                    
-                    // Update item count
-                    document.querySelector('.summary-line:first-child span:first-child').textContent = `Subtotal (${summary.item_count} items)`;
-                    
-                    updateFreeShippingProgress(finalAmount);
-                }
-            } catch (error) {
-                console.error('Error refreshing cart totals:', error);
-            }
-        }
-        
-        // Client-side combo calculation helper
-        function calculateComboPrice(itemCount, regularTotal) {
-            const combo3Price = 1199;
-            const combo5Price = 1699;
-            
-            if (itemCount === 3) {
-                return {
-                    total: combo3Price,
-                    is_combo: true,
-                    combo_type: '3_for_1199',
-                    savings: Math.max(0, regularTotal - combo3Price),
-                    regular_total: regularTotal
-                };
-            } else if (itemCount === 5) {
-                return {
-                    total: combo5Price,
-                    is_combo: true,
-                    combo_type: '5_for_1699',
-                    savings: Math.max(0, regularTotal - combo5Price),
-                    regular_total: regularTotal
-                };
-            }
-            
-            return {
-                total: regularTotal,
-                is_combo: false,
-                combo_type: null,
-                savings: 0,
-                regular_total: regularTotal
-            };
-        }
     </script>
-    
-    <!-- Combo Reminder Popup -->
-<div class="modal" id="comboReminderModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-dialog-centered" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">🎁 Don't Miss Our Combo Offers!</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close" onclick="setComboReminderDismissed()">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body text-center">
-                <div class="combo-offers mb-3">
-                    <div class="offer-item p-3 border rounded mb-2">
-                        <h6 class="text-success">3 Products = ₹1199</h6>
-                        <small class="text-muted">Save up to ₹500!</small>
-                    </div>
-                    <div class="offer-item p-3 border rounded">
-                        <h6 class="text-success">5 Products = ₹1699</h6>
-                        <small class="text-muted">Save up to ₹800!</small>
-                    </div>
-                </div>
-                <p id="comboReminderMessage" class="text-warning font-weight-bold"></p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary" onclick="continueShopping()">Continue Shopping</button>
-                <button type="button" class="btn btn-secondary" onclick="continueCheckout()">Continue Checkout</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 </body>
 </html>

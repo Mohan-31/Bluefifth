@@ -39,6 +39,7 @@ if (!$product || $product['status'] !== 'active') {
 // Check if user is logged in
 $isLoggedIn = isLoggedIn();
 $currentUser = $isLoggedIn ? getCurrentUser() : null;
+$isLoggedIn  = $isLoggedIn && ($currentUser !== null);
 
 // Get related products (FIXED - using correct function)
 $relatedProducts = getRelatedProducts($productId, 4);

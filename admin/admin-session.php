@@ -54,31 +54,15 @@ function requireAdminAuth() {
  * Simple admin authentication for API calls (more lenient)
  */
 function checkAdminAuth() {
-    // Ensure session is started
     if (session_status() !== PHP_SESSION_ACTIVE) {
         session_start();
     }
-    
-    // Debug logging
-    error_log("API Auth Check - Session status: " . session_status());
-    error_log("API Auth Check - Admin logged in: " . (isAdminLoggedIn() ? 'YES' : 'NO'));
-    error_log("API Auth Check - Session ID: " . session_id());
-    
+
     if (!isAdminLoggedIn()) {
         http_response_code(401);
-        echo json_encode([
-            'success' => false, 
-            'message' => 'Admin authentication required',
-            'debug' => [
-                'session_status' => session_status(),
-                'session_id' => session_id(),
-                'admin_logged_in' => $_SESSION['admin_logged_in'] ?? 'not set'
-            ]
-        ]);
+        echo json_encode(['success' => false, 'message' => 'Admin authentication required']);
         exit;
     }
-    
-    error_log("API Auth Check - SUCCESS");
 }
 
 /**

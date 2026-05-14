@@ -223,6 +223,166 @@ function createUser($userData) {
 }
 
 // ============================================================================
+// PHONE-FIRST CUSTOMER IDENTITY
+// ============================================================================
+
+/**
+ * Find an existing user by phone, or create a new one.
+ * Phone number is the sole identity key in the OTP-checkout system.
+ *
+ * For new users: creates users row + referral record + wallet.
+ * For returning users: returns existing row intact (wallet/referrals preserved).
+ *
+ * @param  string $phone  10-digit Indian mobile number (digits only, no country code)
+ * @return array|null     Full users row, or null on DB failure
+ */
+function findOrCreateUserByPhone(string $phone): ?array
+{
+    // Normalise: strip non-digits and leading 91
+    $phone = preg_replace('/\D/', '', $phone);
+    if (strlen($phone) === 12 && str_starts_with($phone, '91')) {
+        $phone = substr($phone, 2);
+    }
+
+    if (!preg_match('/^[6-9]\d{9}$/', $phone)) {
+        error_log("findOrCreateUserByPhone: invalid phone '{$phone}'");
+        return null;
+    }
+
+    try {
+        $conn = getConnection();
+
+        // Look up existing user
+        $stmt = $conn->prepare("SELECT * FROM users WHERE phone = ? LIMIT 1");
+        $stmt->execute([$phone]);
+        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($existing) {
+            // Update last_login and ensure wallet + referral exist
+            $conn->prepare("UPDATE users SET last_login = NOW() WHERE id = ?")->execute([$existing['id']]);
+            ensureUserWallet($existing['id']);
+            return $existing;
+        }
+
+        // New customer — create minimal profile
+        $conn->prepare("
+            INSERT INTO users (phone, user_type, status, created_at, last_login)
+            VALUES (?, 'registered', 'active', NOW(), NOW())
+        ")->execute([$phone]);
+
+        $userId = (int)$conn->lastInsertId();
+
+        // Create referral entry
+        $code = generateReferralCode();
+        $link = generateReferralLink($code);
+        $conn->prepare("INSERT INTO referrals (user_id, code, link) VALUES (?, ?, ?)")
+             ->execute([$userId, $code, $link]);
+
+        // Initialise wallet
+        ensureUserWallet($userId);
+
+        // Return the freshly created row
+        $stmt = $conn->prepare("SELECT * FROM users WHERE id = ? LIMIT 1");
+        $stmt->execute([$userId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+    } catch (Exception $e) {
+        error_log("findOrCreateUserByPhone error: " . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Save or update the default delivery address for a customer.
+ * Called after a successful order so the next checkout is pre-filled.
+ *
+ * @param  int    $userId
+ * @param  array  $addr  Keys: full_name, phone, email, address_line,
+ *                             apartment, city, state, pincode
+ * @return bool
+ */
+function saveCustomerAddress(int $userId, array $addr): bool
+{
+    try {
+        $conn = getConnection();
+
+        // Check if a default already exists
+        $stmt = $conn->prepare("SELECT id FROM customer_addresses WHERE user_id = ? AND is_default = 1 LIMIT 1");
+        $stmt->execute([$userId]);
+        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($existing) {
+            $conn->prepare("
+                UPDATE customer_addresses
+                SET full_name    = ?,
+                    phone        = ?,
+                    email        = ?,
+                    address_line = ?,
+                    apartment    = ?,
+                    city         = ?,
+                    state        = ?,
+                    pincode      = ?,
+                    updated_at   = NOW()
+                WHERE id = ?
+            ")->execute([
+                $addr['full_name']    ?? '',
+                $addr['phone']        ?? '',
+                $addr['email']        ?? '',
+                $addr['address_line'] ?? '',
+                $addr['apartment']    ?? '',
+                $addr['city']         ?? '',
+                $addr['state']        ?? '',
+                $addr['pincode']      ?? '',
+                $existing['id'],
+            ]);
+        } else {
+            $conn->prepare("
+                INSERT INTO customer_addresses
+                    (user_id, label, full_name, phone, email,
+                     address_line, apartment, city, state, pincode, is_default)
+                VALUES (?, 'Home', ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            ")->execute([
+                $userId,
+                $addr['full_name']    ?? '',
+                $addr['phone']        ?? '',
+                $addr['email']        ?? '',
+                $addr['address_line'] ?? '',
+                $addr['apartment']    ?? '',
+                $addr['city']         ?? '',
+                $addr['state']        ?? '',
+                $addr['pincode']      ?? '',
+            ]);
+        }
+
+        // Also keep users table in sync for backward-compat
+        $conn->prepare("
+            UPDATE users
+            SET name    = COALESCE(NULLIF(?, ''), name),
+                email   = COALESCE(NULLIF(?, ''), email),
+                address = COALESCE(NULLIF(?, ''), address),
+                city    = COALESCE(NULLIF(?, ''), city),
+                state   = COALESCE(NULLIF(?, ''), state),
+                pincode = COALESCE(NULLIF(?, ''), pincode)
+            WHERE id = ?
+        ")->execute([
+            $addr['full_name']    ?? '',
+            $addr['email']        ?? '',
+            $addr['address_line'] ?? '',
+            $addr['city']         ?? '',
+            $addr['state']        ?? '',
+            $addr['pincode']      ?? '',
+            $userId,
+        ]);
+
+        return true;
+
+    } catch (Exception $e) {
+        error_log("saveCustomerAddress error: " . $e->getMessage());
+        return false;
+    }
+}
+
+// ============================================================================
 // ENHANCED WALLET SYSTEM FUNCTIONS (FROM ORIGINAL - SUPERIOR VERSION)
 // ============================================================================
 
@@ -5322,7 +5482,6 @@ function checkMaintenanceModeAndRedirect() {
         // Check if user is admin
         $isAdmin = isCurrentUserAdmin();
         
-        error_log("Maintenance check: mode={$maintenanceMode}, isAdmin={$isAdmin}");
         
         if ($maintenanceMode && !$isAdmin) {
             // Try different possible paths for maintenance.html

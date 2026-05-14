@@ -8,10 +8,20 @@ require_once "./auth/session.php"; // Add this line
 // Check if user is logged in
 $isLoggedIn = isLoggedIn();
 $currentUser = $isLoggedIn ? getCurrentUser() : null;
+$isLoggedIn  = $isLoggedIn && ($currentUser !== null);
 
+if (!$isLoggedIn) {
+    header('Location: index.php');
+    exit;
+}
 
-$user_id = $_SESSION['user_id'];
+$user_id = $currentUser['id'];
+$conn    = getConnection();
+$siteName = getSetting('site_name', 'Bluefifth');
 
+$walletBalance = getWalletBalance($user_id);
+$cartSummary   = getCartSummary($user_id);
+$categories    = getAllCategories();
 
 // Fetch user details
 $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
@@ -29,9 +39,23 @@ $cart = $conn->prepare("SELECT c.*, p.name AS product_name
                         WHERE c.user_id = ? ORDER BY c.created_at DESC");
 $cart->execute([$user_id]);
 
+// Fetch recent 5 orders with item count
+$recentOrdersStmt = $conn->prepare("
+    SELECT o.id, o.order_number, o.final_amount, o.status, o.payment_status, o.created_at,
+           COUNT(oi.id) as item_count
+    FROM orders o
+    LEFT JOIN order_items oi ON oi.order_id = o.id
+    WHERE o.user_id = ?
+    GROUP BY o.id, o.order_number, o.final_amount, o.status, o.payment_status, o.created_at
+    ORDER BY o.created_at DESC
+    LIMIT 5
+");
+$recentOrdersStmt->execute([$user_id]);
+$recentOrders = $recentOrdersStmt->fetchAll(PDO::FETCH_ASSOC);
+
 // check if KYC is already uploaded
-$kycCompleted = !empty($user['aadhar_front']) && !empty($user['aadhar_back']) 
-                && !empty($user['pan_front']) && !empty($user['pan_back']);
+$kycCompleted = !empty($user['aadhar_front_path']) && !empty($user['aadhar_back_path'])
+                && !empty($user['pan_front_path']) && !empty($user['pan_back_path']);
 
 
 // ---- File Upload Handling ----
@@ -42,16 +66,22 @@ if (isset($_POST['save_profile'])) {
         mkdir($fullDir, 0777, true);
     }
 
-    $fields = ['aadhar_front', 'aadhar_back', 'pan_front', 'pan_back'];
+    // Maps HTML input name → DB column name
+    $fieldMap = [
+        'aadhar_front' => 'aadhar_front_path',
+        'aadhar_back'  => 'aadhar_back_path',
+        'pan_front'    => 'pan_front_path',
+        'pan_back'     => 'pan_back_path',
+    ];
     $uploadedFiles = [];
 
-    foreach ($fields as $field) {
-        if (!empty($_FILES[$field]['name'])) {
-            $ext = pathinfo($_FILES[$field]['name'], PATHINFO_EXTENSION);
-            $fileName = $field . "_" . $user_id . "_" . time() . "." . strtolower($ext);
+    foreach ($fieldMap as $inputName => $colName) {
+        if (!empty($_FILES[$inputName]['name'])) {
+            $ext      = pathinfo($_FILES[$inputName]['name'], PATHINFO_EXTENSION);
+            $fileName = $inputName . "_" . $user_id . "_" . time() . "." . strtolower($ext);
             $targetPath = $fullDir . $fileName;
-            if (move_uploaded_file($_FILES[$field]['tmp_name'], $targetPath)) {
-                $uploadedFiles[$field] = "/" . $uploadDir . $fileName; // web path
+            if (move_uploaded_file($_FILES[$inputName]['tmp_name'], $targetPath)) {
+                $uploadedFiles[$colName] = "/" . $uploadDir . $fileName;
             }
         }
     }
@@ -76,7 +106,7 @@ if (isset($_POST['save_profile'])) {
   <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profile | Bluefifth</title>
-    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://kit.fontawesome.com/4358befd66.js" crossorigin="anonymous"></script>
     <!-- Required meta tags -->
@@ -135,6 +165,15 @@ if (isset($_POST['save_profile'])) {
       background-color: #343a40;
       color: #fff;
       font-weight: 600;
+    }
+    .recent-order-row {
+      transition: background 0.2s ease;
+    }
+    .recent-order-row:hover {
+      background: #f8f9fa;
+    }
+    .recent-order-row:last-of-type {
+      border-bottom: none !important;
     }
     .table tbody td {
       vertical-align: middle;
@@ -584,8 +623,8 @@ if (isset($_POST['save_profile'])) {
             </div>
 
             <div class="text-center ">
-                <a class="navbar-brand mx-auto " href="../index.php">
-                    <img src="../assets/images/logo.jpg" class="mb-1  img-responsive" alt="<?= htmlspecialchars($siteName) ?>" >
+                <a class="navbar-brand mx-auto " href="index.php">
+                    <img src="assets/images/logo.jpg" class="mb-1  img-responsive" alt="<?= htmlspecialchars($siteName) ?>" >
                 </a>
             </div>
 
@@ -608,7 +647,7 @@ if (isset($_POST['save_profile'])) {
                                 <br><small class="text-muted"><?= htmlspecialchars($currentUser['email']) ?></small>
                             </div>
                             <div class="dropdown-divider"></div>
-                            <a class="dropdown-item" href="../profile.php" onclick="">
+                            <a class="dropdown-item" href="/ecommerce-project/profile.php">
                                 <i class="fas fa-user mr-2"></i>My Profile
                             </a>
                             <a class="dropdown-item" href="javascript:void(0)" onclick="showReferralPopup()">
@@ -617,7 +656,7 @@ if (isset($_POST['save_profile'])) {
                             <a class="dropdown-item" href="javascript:void(0)" onclick="showWalletPopup()">
                                 <i class="fas fa-wallet mr-2"></i>My Wallet
                             </a>
-                            <a class="dropdown-item" href="../account/orders.php">
+                            <a class="dropdown-item" href="/ecommerce-project/account/orders.php">
                                 <i class="fas fa-shopping-bag mr-2"></i>My Orders
                             </a>
                             <div class="dropdown-divider"></div>
@@ -643,7 +682,7 @@ if (isset($_POST['save_profile'])) {
                             <a class="dropdown-item" href="javascript:void(0)" onclick="showWalletPopup()">
                                 <i class="fas fa-wallet mr-2"></i>My Wallet
                             </a>
-                            <a class="dropdown-item" href="../account/orders.php">
+                            <a class="dropdown-item" href="/ecommerce-project/account/orders.php">
                                 <i class="fas fa-shopping-bag mr-2"></i>My Orders
                             </a>
                             <div class="dropdown-divider"></div>
@@ -659,7 +698,7 @@ if (isset($_POST['save_profile'])) {
                 <i class="fa-solid fa-magnifying-glass fa-xl" style="color: #000000; cursor: pointer;" onclick="toggleSearch()"></i>
             </div>
                 <!-- Shopping Cart -->
-                <a href="../shop/cart.php" class="position-relative ">
+                <a href="/ecommerce-project/shop/cart.php" class="position-relative ">
                     <i class="fa-solid fa-cart-shopping fa-xl" style="color: #000000; "></i>
                     <?php if ($cartSummary['item_count'] > 0): ?>
                         <span class="position-absolute badge badge-danger" style="top: -8px; right: -8px; font-size: 0.7rem;">
@@ -695,11 +734,11 @@ if (isset($_POST['save_profile'])) {
                     <?php endforeach; ?>
                     
                     <li class="nav-item">
-                        <a class="nav-link nav-link-st" href="../includes/blog.php">BLOG</a>
+                        <a class="nav-link nav-link-st" href="/ecommerce-project/includes/blog.php">BLOG</a>
                     </li>
-                    
+
                     <li class="nav-item">
-                        <a class="nav-link nav-link-st" href="../includes/about.php">ABOUT US</a>
+                        <a class="nav-link nav-link-st" href="/ecommerce-project/includes/about.php">ABOUT US</a>
                     </li>
                     
                     <!-- Mobile User Menu -->
@@ -711,7 +750,7 @@ if (isset($_POST['save_profile'])) {
                             </div>
                         </li>
                         <li class="nav-item d-lg-none d-block">
-                            <a  href="../profile.php" class="nav-link">
+                            <a href="/ecommerce-project/profile.php" class="nav-link">
                                 <i class="fa-regular fa-chart-line mr-2"></i>My Profile
                             </a>
                         </li>
@@ -726,7 +765,7 @@ if (isset($_POST['save_profile'])) {
                             </a>
                         </li>
                         <li class="nav-item d-lg-none d-block">
-                            <a href="../account/orders.php" class="nav-link">
+                            <a href="/ecommerce-project/account/orders.php" class="nav-link">
                                 <i class="fa-regular fa-shopping-bag mr-2"></i>My Orders
                             </a>
                         </li>
@@ -837,618 +876,124 @@ if (isset($_POST['save_profile'])) {
           </ul>
         </div>
       </div>
-      <div class="card mt-4">
-        <div class="card-header bg-secondary text-white">
-            <h5 class="mb-0">KYC Status</h5>
-        </div>
-        <div class="card-body">
-            <?php if ($user['kyc_status'] === 'verified'): ?>
-                <span class="badge badge-success">✅ Verified</span>
-            <?php else: ?>
-                <span class="badge badge-warning">⏳ Not Verified</span>
-            <?php endif; ?>
-        </div>
     </div>
+  </div><!-- end row -->
 
+  <!-- Recent Orders Section -->
+  <div class="card mt-4" style="border-radius:1rem; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+    <div class="card-header d-flex justify-content-between align-items-center"
+         style="background: linear-gradient(to right, #6C803F, #879D60); color: white; border-radius: 1rem 1rem 0 0; padding: 1rem 1.5rem;">
+      <h5 class="mb-0"><i class="fas fa-shopping-bag mr-2"></i>Recent Orders</h5>
+      <a href="/ecommerce-project/account/orders.php" class="btn btn-sm btn-light" style="font-size:0.85rem; border-radius:8px;">View All</a>
     </div>
-    
-    
-
-    <!-- Uploaded Docs Preview -->
-    <div class="col-md-12 mb-4">
-      <div class="card">
-        <div class="card-body">
-          <h4><i class="fas fa-id-card"></i> KYC Documents</h4>
-          <?php if ($user['aadhar_front']) echo "<p>Aadhar Front:<br><img src='{$user['aadhar_front']}' class='doc-img'></p>"; ?>
-          <?php if ($user['aadhar_back']) echo "<p>Aadhar Back:<br><img src='{$user['aadhar_back']}' class='doc-img'></p>"; ?>
-          <?php if ($user['pan_front']) echo "<p>PAN Front:<br><img src='{$user['pan_front']}' class='doc-img'></p>"; ?>
-          <?php if ($user['pan_back']) echo "<p>Bank passbook:<br><img src='{$user['pan_back']}' class='doc-img'></p>"; ?>
+    <div class="card-body p-0">
+      <?php if (empty($recentOrders)): ?>
+        <div class="text-center py-5">
+          <i class="fas fa-shopping-bag fa-3x text-muted mb-3" style="display:block;"></i>
+          <h5 class="text-muted mb-2">No orders yet</h5>
+          <p class="text-muted mb-4">Start shopping to see your recent orders here.</p>
+          <a href="/ecommerce-project/shop/category.php" class="btn btn-primary">Start Shopping</a>
         </div>
-      </div>
+      <?php else: ?>
+        <?php
+        $orderStatusColors = [
+          'pending'    => 'warning',
+          'processing' => 'info',
+          'shipped'    => 'primary',
+          'delivered'  => 'success',
+          'cancelled'  => 'danger',
+          'returned'   => 'secondary',
+        ];
+        $orderPaymentColors = [
+          'paid'    => 'success',
+          'pending' => 'warning',
+          'failed'  => 'danger',
+          'cod'     => 'info',
+        ];
+        foreach ($recentOrders as $recentOrder):
+          $oDate        = new DateTime($recentOrder['created_at']);
+          $oStatusColor  = $orderStatusColors[strtolower($recentOrder['status'])]          ?? 'secondary';
+          $oPaymentColor = $orderPaymentColors[strtolower($recentOrder['payment_status'])] ?? 'secondary';
+        ?>
+        <div class="d-flex justify-content-between align-items-center px-4 py-3 border-bottom recent-order-row">
+          <div style="min-width:0; flex:1;">
+            <div style="font-weight:600; color:#333; font-size:0.95rem;">
+              #<?= htmlspecialchars($recentOrder['order_number']) ?>
+            </div>
+            <div class="text-muted mt-1" style="font-size:0.82rem;">
+              <i class="fas fa-calendar-alt mr-1"></i><?= $oDate->format('M d, Y \a\t h:i A') ?>
+              &nbsp;&middot;&nbsp;<?= (int)$recentOrder['item_count'] ?> item<?= $recentOrder['item_count'] != 1 ? 's' : '' ?>
+            </div>
+          </div>
+          <div class="text-center mx-3 d-none d-md-block">
+            <span class="badge badge-<?= $oStatusColor ?>" style="font-size:0.78rem; padding:5px 12px; border-radius:12px;">
+              <?= ucfirst(htmlspecialchars($recentOrder['status'])) ?>
+            </span><br>
+            <span class="badge badge-<?= $oPaymentColor ?> mt-1" style="font-size:0.75rem; padding:4px 10px; border-radius:12px;">
+              Payment: <?= ucfirst(htmlspecialchars($recentOrder['payment_status'])) ?>
+            </span>
+          </div>
+          <div class="text-right ml-3" style="white-space:nowrap;">
+            <div style="font-weight:700; font-size:1rem; color:#333;">
+              ₹<?= number_format($recentOrder['final_amount'], 2) ?>
+            </div>
+            <a href="/ecommerce-project/track.php?order=<?= urlencode($recentOrder['order_number']) ?>" class="btn btn-sm btn-outline-primary mt-1"
+               style="font-size:0.78rem; padding:3px 10px; border-radius:8px;">Track</a>
+          </div>
+        </div>
+        <?php endforeach; ?>
+        <div class="text-center py-3">
+          <a href="/ecommerce-project/account/orders.php" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-list mr-1"></i>View All Orders
+          </a>
+        </div>
+      <?php endif; ?>
     </div>
   </div>
-
-  <!-- Upload Form -->
-<?php if ($kycCompleted): ?>
-    <div class="card mt-4">
-        <div class="card-header bg-success text-white">
-            <h5 class="mb-0"><i class="fas fa-id-card"></i> KYC Documents Uploaded</h5>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <strong>Aadhar Front:</strong><br>
-                    <img src="<?= htmlspecialchars($user['aadhar_front']); ?>" class="img-fluid doc-img">
-                </div>
-                <div class="col-md-6">
-                    <strong>Aadhar Back:</strong><br>
-                    <img src="<?= htmlspecialchars($user['aadhar_back']); ?>" class="img-fluid doc-img">
-                </div>
-                <div class="col-md-6 mt-3">
-                    <strong>PAN Front:</strong><br>
-                    <img src="<?= htmlspecialchars($user['pan_front']); ?>" class="img-fluid doc-img">
-                </div>
-                <div class="col-md-6 mt-3">
-                    <strong>Bank passbook:</strong><br>
-                    <img src="<?= htmlspecialchars($user['pan_back']); ?>" class="img-fluid doc-img">
-                </div>
-            </div>
-        </div>
-    </div>
-<?php else: ?>
-    <form action="profile.php" method="POST" enctype="multipart/form-data" class="mt-4">
-        <h5>Upload Aadhar Card</h5>
-        <div class="form-group">
-            <label>Aadhar Front</label>
-            <input type="file" name="aadhar_front" accept="image/*" class="form-control" required>
-        </div>
-        <div class="form-group">
-            <label>Aadhar Back</label>
-            <input type="file" name="aadhar_back" accept="image/*" class="form-control" required>
-        </div>
-
-        <h5>Upload PAN Card</h5>
-        <div class="form-group">
-            <label>PAN Front</label>
-            <input type="file" name="pan_front" accept="image/*" class="form-control" required>
-        </div>
-        <div class="form-group">
-            <label>Bank passbook</label>
-            <input type="file" name="pan_back" accept="image/*" class="form-control" required>
-        </div>
-
-        <button type="submit" name="save_profile" class="btn btn-primary">Save</button>
-    </form>
-<?php endif; ?>
-
-<?php
-// check if KYC form details exist
-$formCompleted = !empty($user['kyc_name']) && !empty($user['kyc_aadhar_number']) 
-                 && !empty($user['kyc_pan_number']) && !empty($user['kyc_bank_account']) 
-                 && !empty($user['kyc_ifsc']);
-
-if (isset($_POST['save_kyc_form'])) {
-    $stmt = $conn->prepare("UPDATE users 
-        SET kyc_name = ?, kyc_aadhar_number = ?, kyc_pan_number = ?, 
-            kyc_bank_account = ?, kyc_ifsc = ? WHERE id = ?");
-    $stmt->execute([
-        $_POST['kyc_name'],
-        $_POST['kyc_aadhar_number'],
-        $_POST['kyc_pan_number'],
-        $_POST['kyc_bank_account'],
-        $_POST['kyc_ifsc'],
-        $user_id
-    ]);
-    header("Location: profile.php?success=1");
-    exit;
-}
-?>
-
-<?php if ($formCompleted): ?>
-    <div class="card mt-4">
-        <div class="card-header bg-success text-white">
-            <h5 class="mb-0">✅ Submitted Forms</h5>
-        </div>
-        <div class="card-body">
-            <p><strong>Name:</strong> <?= htmlspecialchars($user['kyc_name']); ?></p>
-            <p><strong>Aadhar Number:</strong> <?= htmlspecialchars($user['kyc_aadhar_number']); ?></p>
-            <p><strong>PAN Number:</strong> <?= htmlspecialchars($user['kyc_pan_number']); ?></p>
-            <p><strong>Bank Account:</strong> <?= htmlspecialchars($user['kyc_bank_account']); ?></p>
-            <p><strong>IFSC Code:</strong> <?= htmlspecialchars($user['kyc_ifsc']); ?></p>
-        </div>
-    </div>
-<?php else: ?>
-    <form action="profile.php" method="POST" class="card mt-4 p-3">
-        <h5>KYC Information Form</h5>
-        <div class="form-group">
-            <label>Full Name</label>
-            <input type="text" name="kyc_name" class="form-control" required>
-        </div>
-        <div class="form-group">
-            <label>Aadhar Number</label>
-            <input type="text" name="kyc_aadhar_number" class="form-control" maxlength="12" required>
-        </div>
-        <div class="form-group">
-            <label>PAN Number</label>
-            <input type="text" name="kyc_pan_number" class="form-control" maxlength="10" required>
-        </div>
-        <div class="form-group">
-            <label>Bank Account Number</label>
-            <input type="text" name="kyc_bank_account" class="form-control" required>
-        </div>
-        <div class="form-group">
-            <label>Bank IFSC Code</label>
-            <input type="text" name="kyc_ifsc" class="form-control" maxlength="11" required>
-        </div>
-        <button type="submit" name="save_kyc_form" class="btn btn-primary">Submit</button>
-    </form>
-<?php endif; ?>
-<?php if (isset($_GET['success'])): ?>
-    <div class="alert alert-success alert-dismissible fade show" role="alert">
-        ✅ Your details have been saved successfully.
-        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-        </button>
-    </div>
-<?php endif; ?>
 
 
 
 </div>
-<!-- Google Sign-In Script -->
-<script src="https://accounts.google.com/gsi/client" async defer></script>
-
 <!-- JavaScript -->
 <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js"></script>
 
-<!-- INTEGRATED AUTHENTICATION SCRIPT -->
+<!-- APPLICATION SCRIPT -->
 <script>
 let currentUser = <?= $isLoggedIn ? 'true' : 'false' ?>;
 let isLoggedIn = <?= $isLoggedIn ? 'true' : 'false' ?>;
 
-// PRODUCTION-LEVEL SILENT AUTHENTICATION SYSTEM - OPTION A
+// Authentication: phone-OTP at checkout (Google Sign-In removed)
 (function() {
     'use strict';
-    
-    // ========================================
-    // CONFIGURATION & STATE MANAGEMENT
-    // ========================================
-    const CONFIG = {
-        GOOGLE_CLIENT_ID: "340757900430-i8nl6l45ndveq9jmbvbah7ugquauj803.apps.googleusercontent.com",
-        AUTH_ENDPOINT: "auth/google-callback.php",
-        SESSION_TIMEOUT: 3000,
-        MAX_INIT_ATTEMPTS: 50,
-        INIT_CHECK_INTERVAL: 100,
-        SESSION_KEY: 'velona_auth_attempted',
-        FALLBACK_KEY: 'velona_fallback_tried'
-    };
-    
+
     let authState = {
-        isLoggedIn: <?= $isLoggedIn ? 'true' : 'false' ?>,
-        googleInitialized: false,
-        authAttempted: false,
-        fallbackUsed: false,
-        sessionAttempted: sessionStorage.getItem(CONFIG.SESSION_KEY) === 'true'
+        isLoggedIn: <?= $isLoggedIn ? 'true' : 'false' ?>
     };
-    
-    // ========================================
-    // UTILITY FUNCTIONS
-    // ========================================
-    function log(message, data = '') {
-        console.log(`[🔐 Silent Auth] ${message}`, data);
-    }
-    
-    function showLoading() {
-        const loader = document.getElementById('auth-loading');
-        if (loader && !authState.isLoggedIn) {
-            loader.classList.add('show');
-            log("⏳ Loading indicator shown");
-        }
-    }
-    
+
     function hideLoading() {
         const loader = document.getElementById('auth-loading');
-        if (loader) {
-            loader.classList.remove('show');
-            log("✅ Loading indicator hidden");
-        }
+        if (loader) loader.classList.remove('show');
     }
-    
-    function markSessionAttempted() {
-        sessionStorage.setItem(CONFIG.SESSION_KEY, 'true');
-        authState.sessionAttempted = true;
-    }
-    
-    function resetSessionState() {
-        sessionStorage.removeItem(CONFIG.SESSION_KEY);
-        sessionStorage.removeItem(CONFIG.FALLBACK_KEY);
-        authState.sessionAttempted = false;
-        authState.fallbackUsed = false;
-    }
-    
-    // ========================================
-    // GOOGLE API INITIALIZATION
-    // ========================================
-    function initializeGoogle() {
-        if (authState.googleInitialized || typeof google === 'undefined' || !google.accounts?.id) {
-            return false;
-        }
-        
-        try {
-            google.accounts.id.initialize({
-                client_id: CONFIG.GOOGLE_CLIENT_ID,
-                callback: handleAuthResponse,
-                auto_select: true,
-                cancel_on_tap_outside: false,
-                use_fedcm_for_prompt: true,
-                ux_mode: 'popup',
-                context: 'signin'
-            });
-            
-            authState.googleInitialized = true;
-            log("✅ Google Sign-In initialized successfully");
-            return true;
-        } catch (error) {
-            log("❌ Google initialization failed:", error);
-            return false;
-        }
-    }
-    
-    // ========================================
-    // AUTHENTICATION RESPONSE HANDLER
-    // ========================================
-    function handleAuthResponse(response) {
-        if (!response.credential) {
-            log("❌ No credential in response");
-            hideLoading();
-            return;
-        }
-        
-        log("📤 Processing authentication response...");
-        
-        fetch(CONFIG.AUTH_ENDPOINT, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify({
-                id_token: response.credential,
-                silent_auth: true,
-                referral_auth: true
-            }),
-            credentials: 'same-origin'
-        })
-        .then(response => response.json())
-        .then(data => {
-            hideLoading();
-            closeAllPopups();
-            
-            if (data.success) {
-                log("✅ Silent authentication successful");
-                authState.isLoggedIn = true;
-                resetSessionState();
-                
-                // Reload page to update UI
-                setTimeout(() => {
-                    window.location.reload();
-                }, 500);
-            } else {
-                log("❌ Backend authentication failed:", data.message);
-                markSessionAttempted();
-            }
-        })
-        .catch(error => {
-            log("❌ Authentication request failed:", error);
-            hideLoading();
-            markSessionAttempted();
-        });
-    }
-    
-    // ========================================
-    // ANTI-SUPPRESSION TECHNIQUES
-    // ========================================
-    function clearGoogleSuppression() {
-        try {
-            if (!google.accounts?.id) return false;
-            
-            // Method 1: Cancel existing prompts
-            google.accounts.id.cancel();
-            
-            // Method 2: Disable auto-select temporarily
-            google.accounts.id.disableAutoSelect();
-            
-            // Method 3: Re-initialize with different settings
-            setTimeout(() => {
-                google.accounts.id.initialize({
-                    client_id: CONFIG.GOOGLE_CLIENT_ID,
-                    callback: handleAuthResponse,
-                    auto_select: false,
-                    cancel_on_tap_outside: false,
-                    use_fedcm_for_prompt: false,
-                    context: 'signup' // Different context
-                });
-                
-                log("🔄 Google state reset for suppression bypass");
-            }, 100);
-            
-            return true;
-        } catch (error) {
-            log("⚠️ Could not clear suppression:", error);
-            return false;
-        }
-    }
-    
-    function tryFallbackMethods() {
-        if (authState.fallbackUsed || sessionStorage.getItem(CONFIG.FALLBACK_KEY) === 'true') {
-            log("⏭️ Fallback methods already attempted");
-            hideLoading();
-            return;
-        }
-        
-        log("🔄 Attempting fallback authentication methods...");
-        sessionStorage.setItem(CONFIG.FALLBACK_KEY, 'true');
-        authState.fallbackUsed = true;
-        
-        // Fallback 1: Clear suppression and retry
-        if (clearGoogleSuppression()) {
-            setTimeout(() => {
-                if (authState.googleInitialized) {
-                    google.accounts.id.prompt((notification) => {
-                        if (!notification.isDisplayed()) {
-                            log("❌ Fallback method 1 failed");
-                            trySecondaryFallback();
-                        } else {
-                            log("✅ Fallback method 1 successful");
-                        }
-                    });
-                }
-            }, 300);
-        } else {
-            trySecondaryFallback();
-        }
-    }
-    
-    function trySecondaryFallback() {
-        log("Trying secondary fallback...");
-        
-        // Try with completely fresh initialization
-        try {
-            google.accounts.id.initialize({
-                client_id: CONFIG.GOOGLE_CLIENT_ID,
-                callback: handleAuthResponse,
-                auto_select: false,
-                cancel_on_tap_outside: true,
-                use_fedcm_for_prompt: false,
-                context: 'use'
-            });
-            
-            // Give it one more shot
-            google.accounts.id.prompt((notification) => {
-                if (!notification.isDisplayed()) {
-                    log("All fallback methods exhausted - traditional login will be available on manual trigger");
-                    hideLoading();
-                    markSessionAttempted();
-                } else {
-                    log("Secondary fallback successful");
-                }
-            });
-        } catch (error) {
-            log("Secondary fallback error:", error);
-            hideLoading();
-            markSessionAttempted();
-        }
-    }
-    
-    // ========================================
-    // MAIN SILENT AUTHENTICATION LOGIC
-    // ========================================
-    function attemptSilentAuth() {
-        // Skip if already logged in or already attempted this session
-        if (authState.isLoggedIn) {
-            log("👤 User already authenticated");
-            hideLoading();
-            return;
-        }
-        
-        if (authState.sessionAttempted) {
-            log("⏭️ Authentication already attempted this session");
-            hideLoading();
-            return;
-        }
-        
-        if (!authState.googleInitialized && !initializeGoogle()) {
-            log("❌ Google API not available");
-            hideLoading();
-            markSessionAttempted();
-            return;
-        }
-        
-        log("🚀 Starting silent authentication attempt...");
-        authState.authAttempted = true;
-        
-        try {
-            google.accounts.id.prompt((notification) => {
-                const isDisplayed = notification.isDisplayed();
-                const reason = notification.getNotDisplayedReason();
-                
-                log(`Primary attempt result: displayed=${isDisplayed}, reason=${reason}`);
-                
-                if (isDisplayed) {
-                    log("✅ Silent authentication prompt displayed");
-                    // Success - user will interact with the prompt
-                } else {
-                    log(`❌ Silent auth blocked: ${reason}`);
-                    
-                    // Handle specific suppression cases
-                    if (reason === 'suppressed_by_user' || reason === 'user_cancel') {
-                        tryFallbackMethods();
-                    } else {
-                        hideLoading();
-                        markSessionAttempted();
-                    }
-                }
-            });
-            
-            // Safety timeout
-            setTimeout(() => {
-                if (!authState.isLoggedIn) {
-                    hideLoading();
-                    markSessionAttempted();
-                }
-            }, CONFIG.SESSION_TIMEOUT);
-            
-        } catch (error) {
-            log("❌ Silent authentication error:", error);
-            tryFallbackMethods();
-        }
-    }
-    
-    // ========================================
-    // INITIALIZATION SEQUENCE
-    // ========================================
-    function waitForGoogleAndStartAuth() {
-        if (authState.isLoggedIn) {
-            log("👤 User already authenticated, skipping silent auth");
-            hideLoading();
-            return;
-        }
-        
-        showLoading();
-        log("⏳ Waiting for Google Sign-In library...");
-        
-        let attempts = 0;
-        const checkInterval = setInterval(() => {
-            attempts++;
-            
-            if (typeof google !== 'undefined' && google.accounts?.id) {
-                clearInterval(checkInterval);
-                log("✅ Google library loaded successfully");
-                
-                // Small delay to ensure library is fully ready
-                setTimeout(attemptSilentAuth, 200);
-            } else if (attempts >= CONFIG.MAX_INIT_ATTEMPTS) {
-                clearInterval(checkInterval);
-                log("❌ Google library failed to load after maximum attempts");
-                hideLoading();
-                markSessionAttempted();
-            }
-        }, CONFIG.INIT_CHECK_INTERVAL);
-    }
-    
-    // ========================================
-    // PUBLIC API FOR MANUAL LOGIN
-    // ========================================
-    // Traditional Login Functions
+
     window.showTraditionalLoginPopup = function() {
-        log("Traditional login popup requested");
-        
         document.getElementById('modal-overlay').classList.add('show');
         document.getElementById('traditional-login-popup').classList.add('show');
-        
-        // Initialize traditional Google Sign-In button
-        initializeTraditionalGoogleButton();
     };
-    
-    function initializeTraditionalGoogleButton() {
-        if (!authState.googleInitialized && !initializeGoogle()) {
-            document.getElementById('traditional-login-content').innerHTML = `
-                <div class="alert alert-warning">
-                    Google Sign-In is not available. Please try again later.
-                </div>
-            `;
-            return;
-        }
-        
-        try {
-            // Create traditional sign-in button
-            google.accounts.id.renderButton(
-                document.getElementById("google-signin-button"),
-                {
-                    theme: "outline",
-                    size: "large",
-                    width: "300",
-                    text: "signin_with",
-                    shape: "rectangular",
-                    logo_alignment: "left"
-                }
-            );
-            
-            log("Traditional Google button rendered");
-            
-        } catch (error) {
-            log("Error rendering traditional button:", error);
-            document.getElementById('traditional-login-content').innerHTML = `
-                <div class="alert alert-danger">
-                    Failed to load Google Sign-In. Please refresh and try again.
-                </div>
-            `;
-        }
-    }
-    
-    // REPLACE your existing triggerOneTapLogin function with this:
+
     window.triggerOneTapLogin = function() {
-        if (authState.isLoggedIn) {
-            log("User already logged in");
-            return;
-        }
-        
-        log("One-tap login triggered as fallback");
-        
-        if (!authState.googleInitialized && !initializeGoogle()) {
-            log("One-tap fallback: Google Sign-In not available, showing traditional login");
-            showTraditionalLoginPopup();
-            return;
-        }
-        
-        try {
-            resetSessionState();
-            
-            google.accounts.id.prompt((notification) => {
-                log('One-tap fallback result:', notification);
-                
-                if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-                    log('One-tap fallback failed, showing traditional login');
-                    showTraditionalLoginPopup();
-                }
-            });
-        } catch (error) {
-            log("One-tap fallback failed:", error);
-            showTraditionalLoginPopup();
-        }
+        if (authState.isLoggedIn) return;
+        showTraditionalLoginPopup();
     };
-    
-    // ========================================
-    // STARTUP SEQUENCE
-    // ========================================
-    function initializeAuthSystem() {
-        log("🚀 Silent authentication system initialized");
-        
-        // Only attempt silent auth on index page
-        const isIndexPage = window.location.pathname === '/' || 
-                           window.location.pathname === '/index.php' || 
-                           window.location.pathname.endsWith('/');
-        
-        if (isIndexPage) {
-            log("📍 Index page detected - starting silent auth");
-            waitForGoogleAndStartAuth();
-        } else {
-            log("📍 Non-index page - skipping silent auth");
-            hideLoading();
-        }
-    }
-    
-    // Start the system when DOM is ready
+
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initializeAuthSystem);
+        document.addEventListener('DOMContentLoaded', hideLoading);
     } else {
-        initializeAuthSystem();
+        hideLoading();
     }
-    
-    log("🎯 Production-level silent authentication system loaded");
 
 })();
+
 
 // MAIN APPLICATION FUNCTIONS
 let userWalletData = null;

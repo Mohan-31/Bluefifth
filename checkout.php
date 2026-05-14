@@ -1,17 +1,7 @@
 <?php
-// checkout.php - CORRECTED VERSION
 session_start();
 require_once 'includes/database.php';
 require_once 'includes/functions.php';
-
-// ========================================
-// SESSION DEBUG AND CLEANUP
-// ========================================
-// Debug session state
-error_log("SESSION DEBUG: " . json_encode([
-    'applied_coupon' => $_SESSION['applied_coupon'] ?? 'not set',
-    'checkout_coupon_data' => $_SESSION['checkout_coupon_data'] ?? 'not set'
-]));
 
 // Clean up stale coupon sessions if needed
 if (isset($_SESSION['applied_coupon']) && (!isset($_POST['apply_coupon']) && !isset($_POST['remove_coupon']))) {
@@ -23,7 +13,6 @@ if (isset($_SESSION['applied_coupon']) && (!isset($_POST['apply_coupon']) && !is
         if ($stmt->rowCount() == 0) {
             // Coupon no longer valid, clear it
             unset($_SESSION['applied_coupon']);
-            error_log("COUPON CLEANUP: Removed invalid coupon from session");
         }
     } catch (Exception $e) {
         error_log("COUPON VALIDATION ERROR: " . $e->getMessage());
@@ -73,6 +62,32 @@ if (!$isLoggedIn) {
     $totalWalletPoints = ($balance['points'] ?? 0) + ($balance['pending_points'] ?? 0);
     $userInfo = getUserById($userId);
 }
+
+// Phone-OTP verification flag
+$phoneVerified = isset($_SESSION['phone_verified']) && $isLoggedIn;
+
+// Load saved default delivery address for auto-fill
+$savedDefaultAddress = null;
+if ($isLoggedIn && $userId) {
+    try {
+        $addrConn = getConnection();
+        $addrStmt = $addrConn->prepare("SELECT * FROM customer_addresses WHERE user_id = ? AND is_default = 1 LIMIT 1");
+        $addrStmt->execute([$userId]);
+        $savedDefaultAddress = $addrStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    } catch (Exception $e) { /* non-fatal */ }
+}
+
+// Form auto-fill: prefer saved address > users table
+$fillName  = ($savedDefaultAddress['full_name']    ?? '') ?: ($userInfo['name']    ?? '');
+$fillEmail = ($savedDefaultAddress['email']        ?? '') ?: ($userInfo['email']   ?? '');
+$fillAddr1 = ($savedDefaultAddress['address_line'] ?? '') ?: ($userInfo['address'] ?? '');
+$fillApt   = $savedDefaultAddress['apartment'] ?? '';
+$fillCity  = ($savedDefaultAddress['city']    ?? '') ?: ($userInfo['city']    ?? '');
+$fillState = ($savedDefaultAddress['state']   ?? '') ?: ($userInfo['state']   ?? 'TN');
+$fillPin   = ($savedDefaultAddress['pincode'] ?? '') ?: ($userInfo['pincode'] ?? '');
+$fillPhone = $userInfo['phone'] ?? '';
+$fillFirst = $fillName ? explode(' ', trim($fillName))[0] : '';
+$fillLast  = $fillName ? implode(' ', array_slice(explode(' ', trim($fillName)), 1)) : '';
 
 // Calculate combo pricing
 $itemCount = $regularCartSummary['item_count'];
@@ -152,12 +167,18 @@ if (isset($_SESSION['applied_coupon'])) {
     $appliedCoupon = $_SESSION['applied_coupon'];
     $couponCode = $appliedCoupon['code'];
     $couponDiscount = ($totalAmount * $appliedCoupon['discount_percentage']) / 100;
-    error_log("COUPON DEBUG: Session coupon found - Code: {$couponCode}, Discount: {$couponDiscount}");
 } else {
-    error_log("COUPON DEBUG: No session coupon found");
     $appliedCoupon = null;
     $couponDiscount = 0;
     $couponCode = '';
+}
+
+// ========================================
+// FINAL CALCULATIONS - SAFE DIVISION
+// ========================================
+$totalAmountAfterCoupon = $totalAmount;
+if ($couponDiscount > 0) {
+    $totalAmountAfterCoupon = $totalAmount - $couponDiscount;
 }
 
 // Store coupon data in session for invoice and order processing
@@ -172,14 +193,6 @@ if ($appliedCoupon) {
 } else {
     // Clear coupon data if no coupon applied
     unset($_SESSION['checkout_coupon_data']);
-}
-
-// ========================================
-// FINAL CALCULATIONS - SAFE DIVISION
-// ========================================
-$totalAmountAfterCoupon = $totalAmount;
-if ($couponDiscount > 0) {
-    $totalAmountAfterCoupon = $totalAmount - $couponDiscount;
 }
 
 $shippingCost = 0;
@@ -276,8 +289,6 @@ function processCODOrder($formData) {
     global $isLoggedIn, $finalTotalBeforePoints, $totalWalletPoints;
     global $appliedCoupon, $couponDiscount, $totalAmountAfterCoupon, $error;
 
-    error_log("=== COD ORDER PROCESSING START ===");
-    
     $pointsToUse = intval($formData['points_to_use'] ?? 0);
     $referralCodeFromForm = trim($formData['referral_code'] ?? '');
     
@@ -339,14 +350,21 @@ function createRazorpayOrder($formData) {
     $_SESSION['points_to_use'] = $pointsToUse;
     $_SESSION['referral_code'] = trim($formData['referral_code'] ?? '');
     
+    // Guard: Razorpay keys must be configured in admin settings
+    if (empty($razorpayKeyId) || $razorpayKeyId === 'YOUR_RAZORPAY_KEY_ID_HERE' ||
+        empty($razorpayKeySecret) || $razorpayKeySecret === 'YOUR_RAZORPAY_KEY_SECRET_HERE') {
+        $error = 'Payment gateway is not configured. Please use Cash on Delivery or contact support.';
+        return;
+    }
+
     // Create Razorpay order
     $orderData = [
-        'amount' => round($finalPrice * 100),
-        'currency' => 'INR',
-        'receipt' => 'order_' . time(),
+        'amount'          => round($finalPrice * 100),
+        'currency'        => 'INR',
+        'receipt'         => 'order_' . time(),
         'payment_capture' => 1
     ];
-    
+
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, 'https://api.razorpay.com/v1/orders');
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
@@ -354,18 +372,22 @@ function createRazorpayOrder($formData) {
     curl_setopt($ch, CURLOPT_POST, 1);
     curl_setopt($ch, CURLOPT_USERPWD, $razorpayKeyId . ':' . $razorpayKeySecret);
     curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-    
+
     $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
     curl_close($ch);
-    
+
     if ($httpCode === 200) {
         $razorpayOrder = json_decode($response, true);
         $_SESSION['razorpay_order_id'] = $razorpayOrder['id'];
         $showRazorpayCheckout = true;
-        $razorpayOrderData = $razorpayOrder;
+        $razorpayOrderData    = $razorpayOrder;
     } else {
-        $error = 'Failed to create payment order. Please try again.';
+        $apiError = json_decode($response, true);
+        $errorMsg = $apiError['error']['description'] ?? ($curlError ?: 'Unknown error');
+        error_log("Razorpay order creation failed (HTTP $httpCode): $errorMsg");
+        $error = 'Payment gateway error. Please use Cash on Delivery or try again later.';
     }
 }
 
@@ -375,11 +397,6 @@ function processVerifiedOrder($paymentData) {
     global $orderProcessed, $orderId, $orderNumber, $totalAmount, $isComboApplied, $comboSavings, $comboType;
     global $appliedCoupon, $couponDiscount, $isLoggedIn, $finalTotalBeforePoints, $totalWalletPoints;
     global $totalAmountAfterCoupon, $error;
-    
-    // Enhanced logging
-    error_log("=== ORDER CREATION DEBUG START ===");
-    error_log("User ID: " . $userId);
-    error_log("Payment Data: " . json_encode($paymentData));
     
     // Get stored checkout data
     $formData = $_SESSION['checkout_data'] ?? [];
@@ -402,8 +419,6 @@ function processVerifiedOrder($paymentData) {
     $cartItems = $isLoggedIn ? getCartItems($userId) : getSessionCartItems();
     $itemCount = count($cartItems);
     
-    error_log("COMBO CALCULATION: Items: $itemCount, Regular Would Be: $regularTotal, Combo Applied: " . ($isComboApplied ? 'YES' : 'NO') . ", Final: $finalCartTotal");
-    
     // Calculate amounts again using tax-inclusive method
     global $finalTotalBeforePoints, $totalWalletPoints, $cartItems, $taxRate, $shippingCost;
     
@@ -420,9 +435,6 @@ function processVerifiedOrder($paymentData) {
     $discountAmount = min($pointsToUse, $baseAmount);
     $finalPrice = max(0, $baseAmount - $discountAmount);
         
-    error_log("Final Price: " . $finalPrice);
-    error_log("Points to Use: " . $pointsToUse);
-    
     $shippingAddress = [
         'first_name' => trim($formData['first_name'] ?? ''),
         'last_name' => trim($formData['last_name'] ?? ''),
@@ -444,15 +456,12 @@ function processVerifiedOrder($paymentData) {
             throw new Exception('Failed to get database connection');
         }
         
-        error_log("Database connection established");
-        
         // Set PDO attributes for better error handling
         $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $conn->setAttribute(PDO::ATTR_AUTOCOMMIT, FALSE);
         
         // Start transaction
         $conn->beginTransaction();
-        error_log("Transaction started");
         
         // For guest users, save their profile FIRST
         if (!$isLoggedIn || $userId === null) {
@@ -480,15 +489,13 @@ function processVerifiedOrder($paymentData) {
                         // Update their info but keep original user_type
                         $updateStmt = $conn->prepare("UPDATE users SET name = ?, phone = ?, address = ?, city = ?, state = ?, pincode = ? WHERE id = ?");
                         $updateStmt->execute([$guestName, $guestPhone, $guestAddress, $guestCity, $guestState, $guestPincode, $userId]);
-                        
-                        error_log("Using existing user ID: " . $userId . " (type: " . $existingUser['user_type'] . ")");
                     } else {
                         // No user exists - create new guest user
-                        $insertStmt = $conn->prepare("INSERT INTO users (name, email, phone, address, city, state, pincode, user_type) VALUES (?, ?, ?, ?, ?, ?, ?, 'guest')");
+                        $insertStmt = $conn->prepare(
+                            "INSERT INTO users (name, email, phone, address, city, state, pincode, user_type) VALUES (?, ?, ?, ?, ?, ?, ?, 'guest')"
+                        );
                         $insertStmt->execute([$guestName, $guestEmail, $guestPhone, $guestAddress, $guestCity, $guestState, $guestPincode]);
                         $userId = $conn->lastInsertId();
-                        
-                        error_log("Created new guest user ID: " . $userId);
                     }
                     
                 } catch (Exception $e) {
@@ -498,89 +505,60 @@ function processVerifiedOrder($paymentData) {
             }
         }
         
-        // Generate unique order number
-        $orderNumber = 'BLF' . time() . rand(100, 999);
-        error_log("Generated Order Number: " . $orderNumber);
+        $orderNumber = 'VLN' . time() . rand(100, 999);
         
-        // CRITICAL: Check table structure first
-        $structureStmt = $conn->prepare("DESCRIBE orders");
-        $structureStmt->execute();
-        $structure = $structureStmt->fetchAll(PDO::FETCH_ASSOC);
-        error_log("Orders table structure: " . json_encode($structure));
-        
-        // Check current AUTO_INCREMENT value
-        $autoIncrementStmt = $conn->prepare("SHOW TABLE STATUS LIKE 'orders'");
-        $autoIncrementStmt->execute();
-        $tableStatus = $autoIncrementStmt->fetch(PDO::FETCH_ASSOC);
-        error_log("Table AUTO_INCREMENT status: " . json_encode($tableStatus));
-        
-        // Prepare order insertion with explicit column list INCLUDING COMBO DATA
         $orderSql = "
-            INSERT INTO orders 
-            (order_number, user_id, total_amount, tax_amount, shipping_amount, wallet_points_used, final_amount, 
+            INSERT INTO orders
+            (order_number, user_id, total_amount, tax_amount, shipping_amount, wallet_points_used, final_amount,
              shipping_address, billing_address, referral_code, coupon_code, coupon_discount_percentage, coupon_discount_amount,
-             payment_method, status, payment_status, razorpay_payment_id, razorpay_order_id, 
-             is_combo_applied, combo_savings, combo_type, created_at, updated_at) 
+             payment_method, status, payment_status, razorpay_payment_id, razorpay_order_id,
+             is_combo_applied, combo_savings, combo_type, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ";
-        
-        // UPDATE THE ORDER PARAMETERS ARRAY TO INCLUDE COUPON DATA:
-        $orderParams = [
-            $orderNumber,                                    // 1
-            $userId,                                         // 2
-            $finalCartTotal,                                 // 3
-            $taxAmount,                                      // 4
-            $shippingCost,                                   // 5
-            $pointsToUse,                                    // 6
-            $finalPrice,                                     // 7
-            json_encode($shippingAddress),                   // 8
-            json_encode($shippingAddress),                   // 9
-            $referralCodeFromForm ?: null,                   // 10
-            $appliedCoupon['code'] ?? null,                  // 11 - NEW: Coupon code
-            $appliedCoupon['discount_percentage'] ?? null,   // 12 - NEW: Coupon percentage
-            $couponDiscount ?? null,                         // 13 - NEW: Coupon discount amount
-            $paymentMethod,                                  // 14
-            'pending',                                       // 15
-            $paymentStatus,                                  // 16
-            $isCODOrder ? null : $paymentData['razorpay_payment_id'],   // 17
-            $isCODOrder ? null : $paymentData['razorpay_order_id'],     // 18
-            $isComboApplied ? 1 : 0,                        // 19
-            $comboSavings,                                   // 20
-            $comboType                                       // 21
-        ];
-        
-        error_log("SQL Query: " . $orderSql);
 
-        $orderStmt = $conn->prepare($orderSql); 
-        
-        error_log("Order Parameters: " . json_encode($orderParams));
-        
-        // Execute order insertion
+        $orderParams = [
+            $orderNumber,
+            $userId,
+            $finalCartTotal,
+            $taxAmount,
+            $shippingCost,
+            $pointsToUse,
+            $finalPrice,
+            json_encode($shippingAddress),
+            json_encode($shippingAddress),
+            $referralCodeFromForm ?: null,
+            $appliedCoupon['code'] ?? null,
+            $appliedCoupon['discount_percentage'] ?? null,
+            $couponDiscount ?? null,
+            $paymentMethod,
+            'pending',
+            $paymentStatus,
+            $isCODOrder ? null : $paymentData['razorpay_payment_id'],
+            $isCODOrder ? null : $paymentData['razorpay_order_id'],
+            $isComboApplied ? 1 : 0,
+            $comboSavings,
+            $comboType,
+        ];
+
+        $orderStmt = $conn->prepare($orderSql);
         $orderInsertResult = $orderStmt->execute($orderParams);
-        
+
         if (!$orderInsertResult) {
             $errorInfo = $orderStmt->errorInfo();
-            error_log("Order insert failed - Error Info: " . json_encode($errorInfo));
             throw new Exception('Failed to insert order: ' . implode(', ', $errorInfo));
         }
-        
-        error_log("Order insert executed successfully");
-        
+
         // Get the inserted order ID
         $orderDbId = $conn->lastInsertId();
-        error_log("LastInsertId returned: " . $orderDbId . " (type: " . gettype($orderDbId) . ")");
-        
-        // If lastInsertId failed, try alternative method
+
+        // Fallback: look up by order_number if lastInsertId returns 0
         if (!$orderDbId || $orderDbId <= 0) {
-            error_log("LastInsertId failed, trying alternative method");
-            
             $verifyStmt = $conn->prepare("SELECT id FROM orders WHERE order_number = ? ORDER BY created_at DESC LIMIT 1");
             $verifyStmt->execute([$orderNumber]);
             $verifyResult = $verifyStmt->fetch(PDO::FETCH_ASSOC);
-            
+
             if ($verifyResult && isset($verifyResult['id'])) {
                 $orderDbId = (int)$verifyResult['id'];
-                error_log("Retrieved order ID via verification query: " . $orderDbId);
             } else {
                 error_log("Verification query failed - no order found with number: " . $orderNumber);
                 
@@ -749,6 +727,24 @@ function processVerifiedOrder($paymentData) {
         // Clear cart
         clearCart($userId);
         error_log("✅ CART: Cleared successfully");
+
+        // Persist delivery address for one-click repeat checkout
+        if ($userId && !empty($shippingAddress['address'])) {
+            try {
+                saveCustomerAddress($userId, [
+                    'full_name'    => trim(($shippingAddress['first_name'] ?? '') . ' ' . ($shippingAddress['last_name'] ?? '')),
+                    'phone'        => $shippingAddress['phone']     ?? '',
+                    'email'        => $shippingAddress['email']     ?? '',
+                    'address_line' => $shippingAddress['address']   ?? '',
+                    'apartment'    => $shippingAddress['apartment'] ?? '',
+                    'city'         => $shippingAddress['city']      ?? '',
+                    'state'        => $shippingAddress['state']     ?? '',
+                    'pincode'      => $shippingAddress['pincode']   ?? '',
+                ]);
+            } catch (Exception $addrEx) {
+                error_log('saveCustomerAddress error: ' . $addrEx->getMessage());
+            }
+        }
         
         // Clean up session data
         unset($_SESSION['checkout_data'], $_SESSION['points_to_use'], $_SESSION['referral_code'], $_SESSION['razorpay_order_id']);
@@ -890,30 +886,17 @@ function processVerifiedOrder($paymentData) {
         $orderProcessed = true;
         $orderId = $orderDbId;
         
-        error_log("=== ORDER CREATION SUCCESS ===");
-        error_log("Order ID: " . $orderId);
-        error_log("Order Number: " . $orderNumber);
-        error_log("User ID: " . $userId);
-        error_log("Final Amount: " . $finalPrice);
-        error_log("=== ORDER CREATION DEBUG END ===");
-        
         return true;
-        
+
     } catch (Exception $e) {
-        // Rollback transaction
         if ($conn && $conn->inTransaction()) {
             $conn->rollBack();
-            error_log("❌ TRANSACTION: Rolled back due to error");
         }
-        
+
         global $error;
         $error = 'Order processing failed: ' . $e->getMessage();
-        
-        error_log("❌ ORDER ERROR: " . $e->getMessage());
-        error_log("❌ ORDER ERROR FILE: " . $e->getFile() . " Line: " . $e->getLine());
-        error_log("❌ ORDER ERROR TRACE: " . $e->getTraceAsString());
-        error_log("=== ORDER CREATION FAILED ===");
-        
+        error_log("Order creation error: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
+
         return false;
     }
 }
@@ -1185,7 +1168,7 @@ error_log("EMAIL VARIABLES: emailSubtotal=$emailSubtotal, emailTaxExclusiveSubto
     <!doctype html>
     <html lang="en">
     <head>
-      <link rel="stylesheet" href="style.css">
+      <link rel="stylesheet" href="assets/css/style.css">
       <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
       <script src="https://kit.fontawesome.com/4358befd66.js" crossorigin="anonymous"></script>
       <meta charset="utf-8">
@@ -1547,7 +1530,7 @@ error_log("EMAIL VARIABLES: emailSubtotal=$emailSubtotal, emailTaxExclusiveSubto
 <!doctype html>
 <html lang="en">
 <head>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="assets/css/style.css">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://kit.fontawesome.com/4358befd66.js" crossorigin="anonymous"></script>
   <!-- Required meta tags -->
@@ -1911,6 +1894,42 @@ html, body {
   overflow-x: hidden;
 }
 
+/* ===== OTP Gate ===== */
+.otp-gate-wrap { padding: 28px 16px; text-align: center; }
+.otp-gate-icon { font-size: 44px; margin-bottom: 8px; }
+.otp-gate-title { font-size: 20px; font-weight: 700; color: #333; margin-bottom: 6px; }
+.otp-gate-sub { color: #666; font-size: 14px; margin-bottom: 22px; }
+.otp-phone-row { display: flex; align-items: center; gap: 8px; max-width: 420px; margin: 0 auto 10px; }
+.otp-flag { font-size: 14px; white-space: nowrap; color: #444; padding: 10px 12px; background: #f0f0f0; border-radius: 6px; border: 1px solid #ddd; }
+.otp-phone-field { flex: 1; min-width: 0; padding: 10px 14px; font-size: 16px; border: 1.5px solid #ccc; border-radius: 6px; outline: none; transition: border-color .2s; }
+.otp-phone-field:focus { border-color: #6C803F; }
+.otp-primary-btn { padding: 10px 20px; background: #6C803F; color: #fff; border: none; border-radius: 6px; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background .2s; }
+.otp-primary-btn:hover { background: #5a6e33; }
+.otp-primary-btn:disabled { background: #aaa; cursor: not-allowed; }
+.otp-error-msg { color: #dc3545; font-size: 13px; margin-top: 4px; text-align: center; }
+.otp-phone-highlight { font-weight: 600; color: #333; }
+.otp-change-link { color: #6C803F; text-decoration: underline; font-size: 13px; margin-left: 8px; }
+.otp-boxes-row { display: flex; justify-content: center; gap: 10px; margin: 0 auto 14px; }
+.otp-box { width: 46px; height: 54px; text-align: center; font-size: 22px; font-weight: 600; border: 2px solid #ccc; border-radius: 8px; outline: none; transition: border-color .2s; caret-color: transparent; }
+.otp-box:focus { border-color: #6C803F; background: #f9fbf4; }
+.otp-box.filled { border-color: #6C803F; }
+.otp-actions-row { margin-bottom: 14px; }
+.otp-resend-row { font-size: 13px; color: #888; }
+.otp-resend-row a { color: #6C803F; text-decoration: underline; }
+.otp-steps { display: flex; justify-content: center; align-items: center; gap: 6px; margin-bottom: 24px; font-size: 12px; flex-wrap: wrap; }
+.otp-step-dot { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; background: #e0e0e0; color: #888; flex-shrink: 0; }
+.otp-step-dot.active { background: #6C803F; color: #fff; }
+.otp-step-dot.done { background: #879D60; color: #fff; }
+.otp-step-label { color: #999; font-size: 11px; }
+.otp-step-label.active { color: #6C803F; font-weight: 600; }
+.otp-step-line { width: 28px; height: 2px; background: #ddd; border-radius: 2px; flex-shrink: 0; }
+.otp-step-line.done { background: #879D60; }
+@media (max-width: 480px) {
+  .otp-phone-row { flex-wrap: wrap; }
+  .otp-phone-row .otp-primary-btn { width: 100%; }
+  .otp-box { width: 38px; height: 46px; font-size: 18px; gap: 6px; }
+  .otp-boxes-row { gap: 6px; }
+}
 
   </style>
 </head>
@@ -1932,6 +1951,70 @@ html, body {
 
     <div class="row">
       <div class="col-lg-7 p-4" style="background-color:#f8f8f8; border-radius: 8px; ">
+
+        <!-- OTP Gate — verify phone before showing checkout form -->
+        <div id="otp-gate" <?= $phoneVerified ? 'style="display:none"' : '' ?>>
+
+          <!-- Step progress -->
+          <div class="otp-steps">
+            <div class="otp-step-dot active" id="step-dot-1">1</div>
+            <span class="otp-step-label active" id="step-label-1">Mobile</span>
+            <div class="otp-step-line" id="step-line-1"></div>
+            <div class="otp-step-dot" id="step-dot-2">2</div>
+            <span class="otp-step-label" id="step-label-2">Verify OTP</span>
+            <div class="otp-step-line" id="step-line-2"></div>
+            <div class="otp-step-dot" id="step-dot-3">3</div>
+            <span class="otp-step-label" id="step-label-3">Checkout</span>
+          </div>
+
+          <!-- Step 1: Phone number entry -->
+          <div id="otp-step-1">
+            <div class="otp-gate-wrap">
+              <div class="otp-gate-icon">📱</div>
+              <h2 class="otp-gate-title">Enter your mobile number</h2>
+              <p class="otp-gate-sub">We'll send a 6-digit OTP to verify your number</p>
+              <div class="otp-phone-row">
+                <span class="otp-flag">🇮🇳 +91</span>
+                <input type="tel" id="otp-phone-input" class="otp-phone-field"
+                       placeholder="10-digit mobile number" maxlength="10" inputmode="numeric">
+                <button type="button" id="otp-send-btn" class="otp-primary-btn" onclick="handleSendOTP()">Send OTP</button>
+              </div>
+              <div id="otp-phone-error" class="otp-error-msg" style="display:none"></div>
+            </div>
+          </div>
+
+          <!-- Step 2: OTP verification -->
+          <div id="otp-step-2" style="display:none">
+            <div class="otp-gate-wrap">
+              <div class="otp-gate-icon">🔒</div>
+              <h2 class="otp-gate-title">Enter the OTP</h2>
+              <p class="otp-gate-sub">
+                Sent to <span id="otp-phone-display" class="otp-phone-highlight"></span>
+                <a href="#" onclick="showPhoneStep(); return false;" class="otp-change-link">Change</a>
+              </p>
+              <div class="otp-boxes-row" id="otp-boxes">
+                <input type="text" class="otp-box" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
+                <input type="text" class="otp-box" maxlength="1" inputmode="numeric">
+                <input type="text" class="otp-box" maxlength="1" inputmode="numeric">
+                <input type="text" class="otp-box" maxlength="1" inputmode="numeric">
+                <input type="text" class="otp-box" maxlength="1" inputmode="numeric">
+                <input type="text" class="otp-box" maxlength="1" inputmode="numeric">
+              </div>
+              <div id="otp-verify-error" class="otp-error-msg" style="display:none"></div>
+              <div class="otp-actions-row">
+                <button type="button" id="otp-verify-btn" class="otp-primary-btn" onclick="handleVerifyOTP()">Verify &amp; Continue</button>
+              </div>
+              <div class="otp-resend-row">
+                <span id="otp-resend-timer">Resend OTP in <b id="otp-countdown">30</b>s</span>
+                <a href="#" id="otp-resend-link" onclick="handleResendOTP(); return false;" style="display:none">Resend OTP</a>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /#otp-gate -->
+
+        <!-- Checkout Gate — shown only after OTP verified -->
+        <div id="checkout-gate" <?= !$phoneVerified ? 'style="display:none"' : '' ?>>
 
         <!-- Logged In User Checkout Form -->
         <form method="POST" id="checkout-form" >
@@ -2002,8 +2085,8 @@ html, body {
         <section>
           <h2 class="section-title">E-mail</h2>
           <div class="form-group">
-            <input type="email" name="email" class="form-control" placeholder="Email" 
-              value="<?= htmlspecialchars($userInfo['email'] ?? '') ?>" required>
+            <input type="email" name="email" class="form-control" placeholder="Email"
+              value="<?= htmlspecialchars($fillEmail) ?>" required>
           </div>
         </section>
         
@@ -2022,80 +2105,80 @@ html, body {
             <div class="col-md-6">
               <div class="form-group">
                 <label for="firstName">First name *</label>
-                <input type="text" name="first_name" class="form-control" id="firstName" 
-                     value="<?= htmlspecialchars($userInfo ? explode(' ', $userInfo['name'])[0] : '') ?>" required>
+                <input type="text" name="first_name" class="form-control" id="firstName"
+                     value="<?= htmlspecialchars($fillFirst) ?>" required>
               </div>
             </div>
             <div class="col-md-6">
               <div class="form-group">
                 <label for="lastName">Last name *</label>
-                <input type="text" name="last_name" class="form-control" id="lastName" 
-                     value="<?= htmlspecialchars($userInfo ? (explode(' ', $userInfo['name'])[1] ?? '') : '') ?>" required>
+                <input type="text" name="last_name" class="form-control" id="lastName"
+                     value="<?= htmlspecialchars($fillLast) ?>" required>
               </div>
             </div>
           </div>
         
           <div class="form-group">
             <label for="address">Address *</label>
-            <input type="text" name="address" class="form-control" id="address" 
-                   value="<?= htmlspecialchars($userInfo['address'] ?? '') ?>" required>
+            <input type="text" name="address" class="form-control" id="address"
+                   value="<?= htmlspecialchars($fillAddr1) ?>" required>
           </div>
         
           <div class="form-group">
             <label for="apartment">Apartment, suite, etc. (optional)</label>
-            <input type="text" name="apartment" class="form-control" id="apartment" 
-                 value="">
+            <input type="text" name="apartment" class="form-control" id="apartment"
+                 value="<?= htmlspecialchars($fillApt) ?>">
           </div>
         
           <div class="row">
             <div class="col-md-4">
               <div class="form-group">
                 <label for="city">City *</label>
-                <input type="text" name="city" class="form-control" id="city" 
-                     value="<?= htmlspecialchars($userInfo['city'] ?? '') ?>" required>
+                <input type="text" name="city" class="form-control" id="city"
+                     value="<?= htmlspecialchars($fillCity) ?>" required>
               </div>
             </div>
             <div class="col-md-4">
               <div class="form-group">
                 <label for="state">State *</label>
                 <select class="form-control" name="state" id="state" required>
-                  <option value="TN" <?= ($userInfo['state'] ?? 'TN') === 'TN' ? 'selected' : '' ?>>Tamil Nadu</option>
-                  <option value="KA" <?= ($userInfo['state'] ?? '') === 'KA' ? 'selected' : '' ?>>Karnataka</option>
-                  <option value="MH" <?= ($userInfo['state'] ?? '') === 'MH' ? 'selected' : '' ?>>Maharashtra</option>
-                  <option value="DL" <?= ($userInfo['state'] ?? '') === 'DL' ? 'selected' : '' ?>>Delhi</option>
-                  <option value="UP" <?= ($userInfo['state'] ?? '') === 'UP' ? 'selected' : '' ?>>Uttar Pradesh</option>
-                  <option value="GJ" <?= ($userInfo['state'] ?? '') === 'GJ' ? 'selected' : '' ?>>Gujarat</option>
-                  <option value="RJ" <?= ($userInfo['state'] ?? '') === 'RJ' ? 'selected' : '' ?>>Rajasthan</option>
-                  <option value="PB" <?= ($userInfo['state'] ?? '') === 'PB' ? 'selected' : '' ?>>Punjab</option>
-                  <option value="WB" <?= ($userInfo['state'] ?? '') === 'WB' ? 'selected' : '' ?>>West Bengal</option>
-                  <option value="AP" <?= ($userInfo['state'] ?? '') === 'AP' ? 'selected' : '' ?>>Andhra Pradesh</option>
-                  <option value="TG" <?= ($userInfo['state'] ?? '') === 'TG' ? 'selected' : '' ?>>Telangana</option>
-                  <option value="KL" <?= ($userInfo['state'] ?? '') === 'KL' ? 'selected' : '' ?>>Kerala</option>
-                  <option value="OR" <?= ($userInfo['state'] ?? '') === 'OR' ? 'selected' : '' ?>>Odisha</option>
-                  <option value="JH" <?= ($userInfo['state'] ?? '') === 'JH' ? 'selected' : '' ?>>Jharkhand</option>
-                  <option value="AS" <?= ($userInfo['state'] ?? '') === 'AS' ? 'selected' : '' ?>>Assam</option>
-                  <option value="BR" <?= ($userInfo['state'] ?? '') === 'BR' ? 'selected' : '' ?>>Bihar</option>
-                  <option value="CG" <?= ($userInfo['state'] ?? '') === 'CG' ? 'selected' : '' ?>>Chhattisgarh</option>
-                  <option value="GA" <?= ($userInfo['state'] ?? '') === 'GA' ? 'selected' : '' ?>>Goa</option>
-                  <option value="HR" <?= ($userInfo['state'] ?? '') === 'HR' ? 'selected' : '' ?>>Haryana</option>
-                  <option value="HP" <?= ($userInfo['state'] ?? '') === 'HP' ? 'selected' : '' ?>>Himachal Pradesh</option>
-                  <option value="JK" <?= ($userInfo['state'] ?? '') === 'JK' ? 'selected' : '' ?>>Jammu and Kashmir</option>
-                  <option value="MP" <?= ($userInfo['state'] ?? '') === 'MP' ? 'selected' : '' ?>>Madhya Pradesh</option>
-                  <option value="MN" <?= ($userInfo['state'] ?? '') === 'MN' ? 'selected' : '' ?>>Manipur</option>
-                  <option value="ML" <?= ($userInfo['state'] ?? '') === 'ML' ? 'selected' : '' ?>>Meghalaya</option>
-                  <option value="MZ" <?= ($userInfo['state'] ?? '') === 'MZ' ? 'selected' : '' ?>>Mizoram</option>
-                  <option value="NL" <?= ($userInfo['state'] ?? '') === 'NL' ? 'selected' : '' ?>>Nagaland</option>
-                  <option value="SK" <?= ($userInfo['state'] ?? '') === 'SK' ? 'selected' : '' ?>>Sikkim</option>
-                  <option value="TR" <?= ($userInfo['state'] ?? '') === 'TR' ? 'selected' : '' ?>>Tripura</option>
-                  <option value="UT" <?= ($userInfo['state'] ?? '') === 'UT' ? 'selected' : '' ?>>Uttarakhand</option>
+                  <option value="TN" <?= ($fillState ?: 'TN') === 'TN' ? 'selected' : '' ?>>Tamil Nadu</option>
+                  <option value="KA" <?= $fillState === 'KA' ? 'selected' : '' ?>>Karnataka</option>
+                  <option value="MH" <?= $fillState === 'MH' ? 'selected' : '' ?>>Maharashtra</option>
+                  <option value="DL" <?= $fillState === 'DL' ? 'selected' : '' ?>>Delhi</option>
+                  <option value="UP" <?= $fillState === 'UP' ? 'selected' : '' ?>>Uttar Pradesh</option>
+                  <option value="GJ" <?= $fillState === 'GJ' ? 'selected' : '' ?>>Gujarat</option>
+                  <option value="RJ" <?= $fillState === 'RJ' ? 'selected' : '' ?>>Rajasthan</option>
+                  <option value="PB" <?= $fillState === 'PB' ? 'selected' : '' ?>>Punjab</option>
+                  <option value="WB" <?= $fillState === 'WB' ? 'selected' : '' ?>>West Bengal</option>
+                  <option value="AP" <?= $fillState === 'AP' ? 'selected' : '' ?>>Andhra Pradesh</option>
+                  <option value="TG" <?= $fillState === 'TG' ? 'selected' : '' ?>>Telangana</option>
+                  <option value="KL" <?= $fillState === 'KL' ? 'selected' : '' ?>>Kerala</option>
+                  <option value="OR" <?= $fillState === 'OR' ? 'selected' : '' ?>>Odisha</option>
+                  <option value="JH" <?= $fillState === 'JH' ? 'selected' : '' ?>>Jharkhand</option>
+                  <option value="AS" <?= $fillState === 'AS' ? 'selected' : '' ?>>Assam</option>
+                  <option value="BR" <?= $fillState === 'BR' ? 'selected' : '' ?>>Bihar</option>
+                  <option value="CG" <?= $fillState === 'CG' ? 'selected' : '' ?>>Chhattisgarh</option>
+                  <option value="GA" <?= $fillState === 'GA' ? 'selected' : '' ?>>Goa</option>
+                  <option value="HR" <?= $fillState === 'HR' ? 'selected' : '' ?>>Haryana</option>
+                  <option value="HP" <?= $fillState === 'HP' ? 'selected' : '' ?>>Himachal Pradesh</option>
+                  <option value="JK" <?= $fillState === 'JK' ? 'selected' : '' ?>>Jammu and Kashmir</option>
+                  <option value="MP" <?= $fillState === 'MP' ? 'selected' : '' ?>>Madhya Pradesh</option>
+                  <option value="MN" <?= $fillState === 'MN' ? 'selected' : '' ?>>Manipur</option>
+                  <option value="ML" <?= $fillState === 'ML' ? 'selected' : '' ?>>Meghalaya</option>
+                  <option value="MZ" <?= $fillState === 'MZ' ? 'selected' : '' ?>>Mizoram</option>
+                  <option value="NL" <?= $fillState === 'NL' ? 'selected' : '' ?>>Nagaland</option>
+                  <option value="SK" <?= $fillState === 'SK' ? 'selected' : '' ?>>Sikkim</option>
+                  <option value="TR" <?= $fillState === 'TR' ? 'selected' : '' ?>>Tripura</option>
+                  <option value="UT" <?= $fillState === 'UT' ? 'selected' : '' ?>>Uttarakhand</option>
                 </select>
               </div>
             </div>
             <div class="col-md-4">
               <div class="form-group">
                 <label for="pincode">PIN code *</label>
-                <input type="text" name="pincode" class="form-control" id="pincode" 
-                     value="<?= htmlspecialchars($userInfo['pincode'] ?? '') ?>" 
+                <input type="text" name="pincode" class="form-control" id="pincode"
+                     value="<?= htmlspecialchars($fillPin) ?>"
                      pattern="[0-9]{6}" maxlength="6" required>
               </div>
             </div>
@@ -2103,8 +2186,8 @@ html, body {
         
           <div class="form-group">
             <label for="phone">Phone *</label>
-            <input type="tel" name="phone" class="form-control" id="phone" 
-                 value="<?= htmlspecialchars($userInfo['phone'] ?? '') ?>" 
+            <input type="tel" name="phone" class="form-control" id="phone"
+                 value="<?= htmlspecialchars($fillPhone) ?>"
                  pattern="[0-9]{10}" maxlength="10" required>
           </div>
         </section>
@@ -2214,8 +2297,9 @@ html, body {
         </button>
         
         </form>
+        </div><!-- /#checkout-gate -->
         </div>
-        
+
        <!-- Order Summary Sidebar -->
         <div class="col-lg-5">
         <div class="checkout-sidebar">
@@ -2861,6 +2945,218 @@ html, body {
         
         return false;
     }
+
+    /* ===== OTP Gate JS ===== */
+    (function () {
+        var otpPhone = '';
+        var resendTimer = null;
+
+        window.handleSendOTP = function () {
+            var phoneInput = document.getElementById('otp-phone-input');
+            var phone = phoneInput.value.trim().replace(/\D/g, '');
+            var errEl = document.getElementById('otp-phone-error');
+            var btn   = document.getElementById('otp-send-btn');
+            errEl.style.display = 'none';
+            if (!/^[6-9]\d{9}$/.test(phone)) {
+                errEl.textContent = 'Please enter a valid 10-digit Indian mobile number.';
+                errEl.style.display = 'block';
+                return;
+            }
+            otpPhone = phone;
+            btn.disabled = true;
+            btn.textContent = 'Sending…';
+            fetch('shop/api/otp.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: 'send', phone: phone})
+            })
+            .then(function(r){ return r.json(); })
+            .then(function(data) {
+                btn.disabled = false;
+                btn.textContent = 'Send OTP';
+                if (data.success) {
+                    document.getElementById('otp-phone-display').textContent = '+91 ' + phone;
+                    showOTPStep();
+                    startResendTimer();
+                } else {
+                    errEl.textContent = data.message || 'Failed to send OTP.';
+                    errEl.style.display = 'block';
+                }
+            })
+            .catch(function() {
+                btn.disabled = false;
+                btn.textContent = 'Send OTP';
+                errEl.textContent = 'Network error. Please try again.';
+                errEl.style.display = 'block';
+            });
+        };
+
+        window.handleVerifyOTP = function () {
+            var boxes  = document.querySelectorAll('#otp-boxes .otp-box');
+            var otp    = Array.from(boxes).map(function(b){ return b.value; }).join('');
+            var errEl  = document.getElementById('otp-verify-error');
+            var btn    = document.getElementById('otp-verify-btn');
+            errEl.style.display = 'none';
+            if (otp.length < 6) {
+                errEl.textContent = 'Please enter the complete 6-digit OTP.';
+                errEl.style.display = 'block';
+                return;
+            }
+            btn.disabled = true;
+            btn.textContent = 'Verifying…';
+            fetch('shop/api/otp.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: 'verify', phone: otpPhone, otp: otp})
+            })
+            .then(function(r){ return r.json(); })
+            .then(function(data) {
+                btn.disabled = false;
+                btn.textContent = 'Verify & Continue';
+                if (data.success) {
+                    if (resendTimer) clearInterval(resendTimer);
+                    autoFillCheckoutForm(data.user || {});
+                    document.getElementById('otp-gate').style.display = 'none';
+                    document.getElementById('checkout-gate').style.display = 'block';
+                    updateStepDone(1);
+                    updateStepDone(2);
+                    updateStepActive(3);
+                    window.scrollTo({top: 0, behavior: 'smooth'});
+                } else {
+                    errEl.textContent = data.message || 'Incorrect OTP. Please try again.';
+                    errEl.style.display = 'block';
+                    boxes.forEach(function(b){ b.style.borderColor = '#dc3545'; });
+                    setTimeout(function(){ boxes.forEach(function(b){ b.style.borderColor = ''; }); }, 800);
+                }
+            })
+            .catch(function() {
+                btn.disabled = false;
+                btn.textContent = 'Verify & Continue';
+                errEl.textContent = 'Network error. Please try again.';
+                errEl.style.display = 'block';
+            });
+        };
+
+        window.handleResendOTP = function () {
+            var errEl = document.getElementById('otp-verify-error');
+            errEl.style.display = 'none';
+            fetch('shop/api/otp.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: 'resend', phone: otpPhone})
+            })
+            .then(function(r){ return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    document.getElementById('otp-resend-link').style.display = 'none';
+                    startResendTimer();
+                    document.querySelectorAll('#otp-boxes .otp-box').forEach(function(b){ b.value = ''; b.classList.remove('filled'); });
+                    document.querySelectorAll('#otp-boxes .otp-box')[0].focus();
+                } else {
+                    errEl.textContent = data.message || 'Could not resend OTP.';
+                    errEl.style.display = 'block';
+                }
+            });
+        };
+
+        window.showPhoneStep = function () {
+            document.getElementById('otp-step-2').style.display = 'none';
+            document.getElementById('otp-step-1').style.display = 'block';
+            setStepClass('step-dot-1', 'active'); setStepClass('step-label-1', 'active');
+            setStepClass('step-dot-2', '');        setStepClass('step-label-2', '');
+            setStepClass('step-line-1', '');
+            if (resendTimer) clearInterval(resendTimer);
+        };
+
+        function showOTPStep() {
+            document.getElementById('otp-step-1').style.display = 'none';
+            document.getElementById('otp-step-2').style.display = 'block';
+            setStepClass('step-dot-1', 'done');   setStepClass('step-label-1', '');
+            setStepClass('step-dot-2', 'active'); setStepClass('step-label-2', 'active');
+            setStepClass('step-line-1', 'done');
+            var first = document.querySelector('#otp-boxes .otp-box');
+            if (first) first.focus();
+        }
+
+        function updateStepDone(n) {
+            setStepClass('step-dot-' + n, 'done'); setStepClass('step-label-' + n, '');
+            if (n < 3) setStepClass('step-line-' + n, 'done');
+        }
+        function updateStepActive(n) {
+            setStepClass('step-dot-' + n, 'active'); setStepClass('step-label-' + n, 'active');
+        }
+        function setStepClass(id, mod) {
+            var el = document.getElementById(id); if (!el) return;
+            var base = id.startsWith('step-dot') ? 'otp-step-dot' : id.startsWith('step-label') ? 'otp-step-label' : 'otp-step-line';
+            el.className = base + (mod ? ' ' + mod : '');
+        }
+
+        function startResendTimer() {
+            var countdown = 30;
+            var timerEl = document.getElementById('otp-resend-timer');
+            var linkEl  = document.getElementById('otp-resend-link');
+            var countEl = document.getElementById('otp-countdown');
+            timerEl.style.display = 'inline'; linkEl.style.display = 'none';
+            countEl.textContent = countdown;
+            if (resendTimer) clearInterval(resendTimer);
+            resendTimer = setInterval(function() {
+                countdown--;
+                countEl.textContent = countdown;
+                if (countdown <= 0) {
+                    clearInterval(resendTimer);
+                    timerEl.style.display = 'none';
+                    linkEl.style.display = 'inline';
+                }
+            }, 1000);
+        }
+
+        function autoFillCheckoutForm(user) {
+            if (!user) return;
+            var name  = (user.full_name || user.name || '').trim();
+            var parts = name.split(/\s+/);
+            function setVal(id, val) { var el = document.getElementById(id); if (el && val) el.value = val; }
+            setVal('firstName', parts[0] || '');
+            setVal('lastName',  parts.slice(1).join(' ') || '');
+            setVal('address',   user.address);
+            setVal('apartment', user.apartment);
+            setVal('city',      user.city);
+            setVal('pincode',   user.pincode);
+            setVal('phone',     user.phone);
+            var emailEl = document.querySelector('#checkout-form input[name="email"]');
+            if (emailEl && user.email) emailEl.value = user.email;
+            if (user.state) { var st = document.getElementById('state'); if (st) st.value = user.state; }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var phoneInput = document.getElementById('otp-phone-input');
+            if (phoneInput) {
+                phoneInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); handleSendOTP(); } });
+            }
+            var boxes = document.querySelectorAll('#otp-boxes .otp-box');
+            boxes.forEach(function(box, idx) {
+                box.addEventListener('input', function(e) {
+                    var val = e.target.value.replace(/\D/g, '');
+                    e.target.value = val.slice(-1);
+                    e.target.classList.toggle('filled', !!e.target.value);
+                    if (val && idx < boxes.length - 1) boxes[idx + 1].focus();
+                    if (idx === boxes.length - 1 && val) handleVerifyOTP();
+                });
+                box.addEventListener('keydown', function(e) {
+                    if (e.key === 'Backspace' && !e.target.value && idx > 0) {
+                        boxes[idx - 1].focus(); boxes[idx - 1].value = ''; boxes[idx - 1].classList.remove('filled');
+                    }
+                    if (e.key === 'Enter') { e.preventDefault(); handleVerifyOTP(); }
+                });
+                box.addEventListener('paste', function(e) {
+                    e.preventDefault();
+                    var text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+                    boxes.forEach(function(b, i) { b.value = text[i] || ''; b.classList.toggle('filled', !!b.value); });
+                    if (text.length >= 6) handleVerifyOTP();
+                    else if (text.length > 0) boxes[Math.min(text.length, 5)].focus();
+                });
+            });
+        });
+    }());
 
   </script>
 

@@ -57,6 +57,7 @@ if ($referralCode && isValidReferralCode($referralCode)) {
 // Check if user is logged in
 $isLoggedIn = isLoggedIn();
 $currentUser = $isLoggedIn ? getCurrentUser() : null;
+$isLoggedIn  = $isLoggedIn && ($currentUser !== null);
 
 // Get featured products
 $featuredProducts = getFeaturedProducts(8);
@@ -573,8 +574,8 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
             </div>
 
             <div class="text-center ">
-                <a class="navbar-brand mx-auto " href="../index.php">
-                    <img src="../assets/images/logo.jpg" class="mb-1  img-responsive" alt="<?= htmlspecialchars($siteName) ?>" >
+                <a class="navbar-brand mx-auto " href="/ecommerce-project/index.php">
+                    <img src="/ecommerce-project/assets/images/logo.jpg" class="mb-1  img-responsive" alt="<?= htmlspecialchars($siteName) ?>" >
                 </a>
             </div>
 
@@ -593,11 +594,11 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
                            data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"></i>
                         <div class="dropdown-menu dropdown-menu-right">
                             <div class="dropdown-header">
-                                <strong><?= htmlspecialchars($currentUser['name']) ?></strong>
-                                <br><small class="text-muted"><?= htmlspecialchars($currentUser['email']) ?></small>
+                                <strong><?= htmlspecialchars($currentUser['name'] ?? '') ?></strong>
+                                <br><small class="text-muted"><?= htmlspecialchars($currentUser['email'] ?? '') ?></small>
                             </div>
                             <div class="dropdown-divider"></div>
-                            <a class="dropdown-item" href="../profile.php" onclick="">
+                            <a class="dropdown-item" href="/ecommerce-project/profile.php">
                                 <i class="fas fa-user mr-2"></i>My Profile
                             </a>
                             <a class="dropdown-item" href="javascript:void(0)" onclick="showReferralPopup()">
@@ -606,7 +607,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
                             <a class="dropdown-item" href="javascript:void(0)" onclick="showWalletPopup()">
                                 <i class="fas fa-wallet mr-2"></i>My Wallet
                             </a>
-                            <a class="dropdown-item" href="../account/orders.php">
+                            <a class="dropdown-item" href="/ecommerce-project/account/orders.php">
                                 <i class="fas fa-shopping-bag mr-2"></i>My Orders
                             </a>
                             <div class="dropdown-divider"></div>
@@ -632,7 +633,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
                             <a class="dropdown-item" href="javascript:void(0)" onclick="showWalletPopup()">
                                 <i class="fas fa-wallet mr-2"></i>My Wallet
                             </a>
-                            <a class="dropdown-item" href="../account/orders.php">
+                            <a class="dropdown-item" href="/ecommerce-project/account/orders.php">
                                 <i class="fas fa-shopping-bag mr-2"></i>My Orders
                             </a>
                             <div class="dropdown-divider"></div>
@@ -648,7 +649,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
                 <i class="fa-solid fa-magnifying-glass fa-xl" style="color: #000000; cursor: pointer;" onclick="toggleSearch()"></i>
             </div>
                 <!-- Shopping Cart -->
-                <a href="../shop/cart.php" class="position-relative ">
+                <a href="/ecommerce-project/shop/cart.php" class="position-relative ">
                     <i class="fa-solid fa-cart-shopping fa-xl" style="color: #000000; "></i>
                     <?php if ($cartSummary['item_count'] > 0): ?>
                         <span class="position-absolute badge badge-danger" style="top: -8px; right: -8px; font-size: 0.7rem;">
@@ -658,13 +659,13 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
                 </a>
             </div>
         </div>
-        
+
         <!-- Bottom Row - Navigation -->
         <div class="w-100 mt-3">
             <div class="collapse navbar-collapse justify-content-between" id="navbarSupportedContent">
                 <ul class="navbar-nav m-auto">
                     <li class="nav-item ">
-                        <a class="nav-link nav-link-st active" href="../index.php">HOME</a>
+                        <a class="nav-link nav-link-st active" href="/ecommerce-project/index.php">HOME</a>
                     </li>
                     
                     <!-- Dynamic Categories -->
@@ -680,30 +681,30 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
                         ?>
                         <li class="nav-item">
                             <a class="nav-link nav-link-st <?= $isActive ? 'active' : '' ?>" 
-                               href="../shop/category.php?category=<?= urlencode($category['slug']) ?>">
+                               href="shop/category.php?category=<?= urlencode($category['slug']) ?>">
                                 <?= strtoupper(htmlspecialchars($category['name'])) ?>
                             </a>
                         </li>
                     <?php endforeach; ?>
                     
                     <li class="nav-item">
-                        <a class="nav-link nav-link-st" href="../includes/blog.php">BLOG</a>
+                        <a class="nav-link nav-link-st" href="includes/blog.php">BLOG</a>
                     </li>
                     
                     <li class="nav-item">
-                        <a class="nav-link nav-link-st" href="../includes/about.php">ABOUT US</a>
+                        <a class="nav-link nav-link-st" href="includes/about.php">ABOUT US</a>
                     </li>
                     
                     <!-- Mobile User Menu -->
                     <?php if ($isLoggedIn): ?>
                         <li class="nav-item mt-4 mb-4 d-lg-none d-block">
                             <div class="nav-link">
-                                <strong><?= htmlspecialchars($currentUser['name']) ?></strong>
+                                <strong><?= htmlspecialchars($currentUser['name'] ?? '') ?></strong>
                                 <br><small>Wallet: ₹<?= number_format($walletBalance['points'] + $walletBalance['pending_points']) ?></small>
                             </div>
                         </li>
                         <li class="nav-item d-lg-none d-block">
-                            <a href="../profile.php" onclick="" class="nav-link">
+                            <a href="profile.php" onclick="" class="nav-link">
                                 <i class="fa-regular fa-chart-line mr-2"></i>My Profile
                             </a>
                         </li>
@@ -718,7 +719,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
                             </a>
                         </li>
                         <li class="nav-item d-lg-none d-block">
-                            <a href="../account/orders.php" class="nav-link">
+                            <a href="account/orders.php" class="nav-link">
                                 <i class="fa-regular fa-shopping-bag mr-2"></i>My Orders
                             </a>
                         </li>
@@ -745,7 +746,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
                             </a>
                         </li>
                         <li class="nav-item d-lg-none d-block">
-                            <a href="../account/orders.php" class="nav-link">
+                            <a href="account/orders.php" class="nav-link">
                                 <i class="fa-regular fa-shopping-bag mr-2"></i>My Orders
                             </a>
                         </li>
@@ -840,16 +841,13 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
     </div>
     
     <div id="traditional-login-content" class="text-center" style="padding: 2rem;">
-        <p class="text-muted mb-4">Choose your preferred login method</p>
-        
-        <!-- Google Sign-In Button -->
-         <div id="google-signin-button" class="mb-3 d-flex justify-content-center"></div>
-
-        <!-- Alternative login note -->
+        <div style="font-size: 48px; margin-bottom: 12px;">🛍️</div>
+        <h4 style="font-weight:700; color:#333; margin-bottom:8px;">No login needed to browse!</h4>
+        <p class="text-muted mb-4">Just add products to your cart and we'll verify your phone at checkout — fast and secure.</p>
+        <a href="shop/category.php" class="btn btn-dark btn-block mb-3" onclick="closeAllPopups()">Continue Shopping</a>
+        <a href="checkout.php" class="btn btn-outline-secondary btn-block" onclick="closeAllPopups()">Go to Checkout</a>
         <div class="mt-4 pt-3 border-top">
-            <small class="text-muted">
-                By continuing, you agree to our Terms of Service and Privacy Policy
-            </small>
+            <small class="text-muted">Your identity is verified via OTP at checkout</small>
         </div>
     </div>
 </div>
@@ -1152,8 +1150,8 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
                 <div class="footer-logo">
                     <img class="" src="./assets/images/logo3.png" width="160px" alt="Velona">
                 </div>
-                <a href="../index.php" class="mt-5">HOME</a>
-                <a href="../includes/about.php">ABOUT US</a>
+                <a href="/ecommerce-project/index.php" class="mt-5">HOME</a>
+                <a href="/ecommerce-project/includes/about.php">ABOUT US</a>
                 <a href="#" data-toggle="modal" data-target="#contactUsModal">CONTACT US</a>
             </div>
             <style>
@@ -1183,7 +1181,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
                     <button type="submit" class="subscribe-btn">Subscribe</button>
                 </form>
                 <div class="payments mt-4">
-                    <img src="../assets/images/payment-methods.png" alt="payment">
+                    <img src="/ecommerce-project/assets/images/payment-methods.png" alt="payment">
                 </div>
             </div>
         </div>
@@ -1561,446 +1559,44 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
     </div>
 </div>
 
-<!-- Google Sign-In Script -->
-<script src="https://accounts.google.com/gsi/client" async defer></script>
-
 <!-- JavaScript -->
 <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js"></script>
 
-
-
-<!-- INTEGRATED AUTHENTICATION SCRIPT -->
+<!-- APPLICATION SCRIPT -->
 <script>
 let currentUser = <?= $isLoggedIn ? 'true' : 'false' ?>;
 let isLoggedIn = <?= $isLoggedIn ? 'true' : 'false' ?>;
 
-// PRODUCTION-LEVEL SILENT AUTHENTICATION SYSTEM - OPTION A
+// Authentication: phone-OTP at checkout (Google Sign-In removed)
 (function() {
     'use strict';
-    
-    // ========================================
-    // CONFIGURATION & STATE MANAGEMENT
-    // ========================================
-    const CONFIG = {
-        GOOGLE_CLIENT_ID: "340757900430-i8nl6l45ndveq9jmbvbah7ugquauj803.apps.googleusercontent.com",
-        AUTH_ENDPOINT: "auth/google-callback.php",
-        SESSION_TIMEOUT: 3000,
-        MAX_INIT_ATTEMPTS: 50,
-        INIT_CHECK_INTERVAL: 100,
-        SESSION_KEY: 'velona_auth_attempted',
-        FALLBACK_KEY: 'velona_fallback_tried'
-    };
-    
+
     let authState = {
-        isLoggedIn: <?= $isLoggedIn ? 'true' : 'false' ?>,
-        googleInitialized: false,
-        authAttempted: false,
-        fallbackUsed: false,
-        sessionAttempted: sessionStorage.getItem(CONFIG.SESSION_KEY) === 'true'
+        isLoggedIn: <?= $isLoggedIn ? 'true' : 'false' ?>
     };
-    
-    // ========================================
-    // UTILITY FUNCTIONS
-    // ========================================
-    function log(message, data = '') {
-        console.log(`[🔐 Silent Auth] ${message}`, data);
-    }
-    
-    function showLoading() {
-        const loader = document.getElementById('auth-loading');
-        if (loader && !authState.isLoggedIn) {
-            loader.classList.add('show');
-            log("⏳ Loading indicator shown");
-        }
-    }
     
     function hideLoading() {
         const loader = document.getElementById('auth-loading');
-        if (loader) {
-            loader.classList.remove('show');
-            log("✅ Loading indicator hidden");
-        }
+        if (loader) loader.classList.remove('show');
     }
-    
-    function markSessionAttempted() {
-        sessionStorage.setItem(CONFIG.SESSION_KEY, 'true');
-        authState.sessionAttempted = true;
-    }
-    
-    function resetSessionState() {
-        sessionStorage.removeItem(CONFIG.SESSION_KEY);
-        sessionStorage.removeItem(CONFIG.FALLBACK_KEY);
-        authState.sessionAttempted = false;
-        authState.fallbackUsed = false;
-    }
-    
-    // ========================================
-    // GOOGLE API INITIALIZATION
-    // ========================================
-    function initializeGoogle() {
-        if (authState.googleInitialized || typeof google === 'undefined' || !google.accounts?.id) {
-            return false;
-        }
-        
-        try {
-            google.accounts.id.initialize({
-                client_id: CONFIG.GOOGLE_CLIENT_ID,
-                callback: handleAuthResponse,
-                auto_select: true,
-                cancel_on_tap_outside: false,
-                use_fedcm_for_prompt: true,
-                ux_mode: 'popup',
-                context: 'signin'
-            });
-            
-            authState.googleInitialized = true;
-            log("✅ Google Sign-In initialized successfully");
-            return true;
-        } catch (error) {
-            log("❌ Google initialization failed:", error);
-            return false;
-        }
-    }
-    
-    // ========================================
-    // AUTHENTICATION RESPONSE HANDLER
-    // ========================================
-    function handleAuthResponse(response) {
-        if (!response.credential) {
-            log("❌ No credential in response");
-            hideLoading();
-            return;
-        }
-        
-        log("📤 Processing authentication response...");
-        
-        fetch(CONFIG.AUTH_ENDPOINT, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify({
-                id_token: response.credential,
-                silent_auth: true,
-                referral_auth: true
-            }),
-            credentials: 'same-origin'
-        })
-        .then(response => response.json())
-        .then(data => {
-            hideLoading();
-            closeAllPopups();
-            
-            if (data.success) {
-                log("✅ Silent authentication successful");
-                authState.isLoggedIn = true;
-                resetSessionState();
-                
-                // Reload page to update UI
-                setTimeout(() => {
-                    window.location.reload();
-                }, 500);
-            } else {
-                log("❌ Backend authentication failed:", data.message);
-                markSessionAttempted();
-            }
-        })
-        .catch(error => {
-            log("❌ Authentication request failed:", error);
-            hideLoading();
-            markSessionAttempted();
-        });
-    }
-    
-    /*
-    // ========================================
-    // ANTI-SUPPRESSION TECHNIQUES
-    // ========================================
-    function clearGoogleSuppression() {
-        try {
-            if (!google.accounts?.id) return false;
-            
-            // Method 1: Cancel existing prompts
-            google.accounts.id.cancel();
-            
-            // Method 2: Disable auto-select temporarily
-            google.accounts.id.disableAutoSelect();
-            
-            // Method 3: Re-initialize with different settings
-            setTimeout(() => {
-                google.accounts.id.initialize({
-                    client_id: CONFIG.GOOGLE_CLIENT_ID,
-                    callback: handleAuthResponse,
-                    auto_select: false,
-                    cancel_on_tap_outside: false,
-                    use_fedcm_for_prompt: false,
-                    context: 'signup' // Different context
-                });
-                
-                log("🔄 Google state reset for suppression bypass");
-            }, 100);
-            
-            return true;
-        } catch (error) {
-            log("⚠️ Could not clear suppression:", error);
-            return false;
-        }
-    }
-    
-    function tryFallbackMethods() {
-        if (authState.fallbackUsed || sessionStorage.getItem(CONFIG.FALLBACK_KEY) === 'true') {
-            log("⏭️ Fallback methods already attempted");
-            hideLoading();
-            return;
-        }
-        
-        log("🔄 Attempting fallback authentication methods...");
-        sessionStorage.setItem(CONFIG.FALLBACK_KEY, 'true');
-        authState.fallbackUsed = true;
-        
-        // Fallback 1: Clear suppression and retry
-        if (clearGoogleSuppression()) {
-            setTimeout(() => {
-                if (authState.googleInitialized) {
-                    google.accounts.id.prompt((notification) => {
-                        if (!notification.isDisplayed()) {
-                            log("❌ Fallback method 1 failed");
-                            trySecondaryFallback();
-                        } else {
-                            log("✅ Fallback method 1 successful");
-                        }
-                    });
-                }
-            }, 300);
-        } else {
-            trySecondaryFallback();
-        }
-    }
-    
-    function trySecondaryFallback() {
-        log("Trying secondary fallback...");
-        
-        // Try with completely fresh initialization
-        try {
-            google.accounts.id.initialize({
-                client_id: CONFIG.GOOGLE_CLIENT_ID,
-                callback: handleAuthResponse,
-                auto_select: false,
-                cancel_on_tap_outside: true,
-                use_fedcm_for_prompt: false,
-                context: 'use'
-            });
-            
-            // Give it one more shot
-            google.accounts.id.prompt((notification) => {
-                if (!notification.isDisplayed()) {
-                    log("All fallback methods exhausted - traditional login will be available on manual trigger");
-                    hideLoading();
-                    markSessionAttempted();
-                } else {
-                    log("Secondary fallback successful");
-                }
-            });
-        } catch (error) {
-            log("Secondary fallback error:", error);
-            hideLoading();
-            markSessionAttempted();
-        }
-    }
-    
-    // ========================================
-    // MAIN SILENT AUTHENTICATION LOGIC
-    // ========================================
-    function attemptSilentAuth() {
-        // Skip if already logged in or already attempted this session
-        if (authState.isLoggedIn) {
-            log("👤 User already authenticated");
-            hideLoading();
-            return;
-        }
-        
-        if (authState.sessionAttempted) {
-            log("⏭️ Authentication already attempted this session");
-            hideLoading();
-            return;
-        }
-        
-        if (!authState.googleInitialized && !initializeGoogle()) {
-            log("❌ Google API not available");
-            hideLoading();
-            markSessionAttempted();
-            return;
-        }
-        
-        log("🚀 Starting silent authentication attempt...");
-        authState.authAttempted = true;
-        
-        try {
-            google.accounts.id.prompt((notification) => {
-                const isDisplayed = notification.isDisplayed();
-                const reason = notification.getNotDisplayedReason();
-                
-                log(`Primary attempt result: displayed=${isDisplayed}, reason=${reason}`);
-                
-                if (isDisplayed) {
-                    log("✅ Silent authentication prompt displayed");
-                    // Success - user will interact with the prompt
-                } else {
-                    log(`❌ Silent auth blocked: ${reason}`);
-                    
-                    // Handle specific suppression cases
-                    if (reason === 'suppressed_by_user' || reason === 'user_cancel') {
-                        tryFallbackMethods();
-                    } else {
-                        hideLoading();
-                        markSessionAttempted();
-                    }
-                }
-            });
-            
-            // Safety timeout
-            setTimeout(() => {
-                if (!authState.isLoggedIn) {
-                    hideLoading();
-                    markSessionAttempted();
-                }
-            }, CONFIG.SESSION_TIMEOUT);
-            
-        } catch (error) {
-            log("❌ Silent authentication error:", error);
-            tryFallbackMethods();
-        }
-    }
-    
-    // ========================================
-    // INITIALIZATION SEQUENCE
-    // ========================================
-    function waitForGoogleAndStartAuth() {
-        if (authState.isLoggedIn) {
-            log("👤 User already authenticated, skipping silent auth");
-            hideLoading();
-            return;
-        }
-        
-        showLoading();
-        log("⏳ Waiting for Google Sign-In library...");
-        
-        let attempts = 0;
-        const checkInterval = setInterval(() => {
-            attempts++;
-            
-            if (typeof google !== 'undefined' && google.accounts?.id) {
-                clearInterval(checkInterval);
-                log("✅ Google library loaded successfully");
-                
-                // Small delay to ensure library is fully ready
-                setTimeout(attemptSilentAuth, 200);
-            } else if (attempts >= CONFIG.MAX_INIT_ATTEMPTS) {
-                clearInterval(checkInterval);
-                log("❌ Google library failed to load after maximum attempts");
-                hideLoading();
-                markSessionAttempted();
-            }
-        }, CONFIG.INIT_CHECK_INTERVAL);
-    }
-    */
-    
-    // ========================================
-    // PUBLIC API FOR MANUAL LOGIN
-    // ========================================
-    // Traditional Login Functions
+
+    // Show info popup (no login required — auth happens at checkout)
     window.showTraditionalLoginPopup = function() {
-        log("Traditional login popup requested");
-        
         document.getElementById('modal-overlay').classList.add('show');
         document.getElementById('traditional-login-popup').classList.add('show');
-        
-        // Initialize traditional Google Sign-In button
-        initializeTraditionalGoogleButton();
     };
-    
-    function initializeTraditionalGoogleButton() {
-        if (!authState.googleInitialized && !initializeGoogle()) {
-            document.getElementById('traditional-login-content').innerHTML = `
-                <div class="alert alert-warning">
-                    Google Sign-In is not available. Please try again later.
-                </div>
-            `;
-            return;
-        }
-        
-        try {
-            // Create traditional sign-in button
-            google.accounts.id.renderButton(
-                document.getElementById("google-signin-button"),
-                {
-                    theme: "outline",
-                    size: "large",
-                    width: "300",
-                    text: "signin_with",
-                    shape: "rectangular",
-                    logo_alignment: "left"
-                }
-            );
-            
-            log("Traditional Google button rendered");
-            
-        } catch (error) {
-            log("Error rendering traditional button:", error);
-            document.getElementById('traditional-login-content').innerHTML = `
-                <div class="alert alert-danger">
-                    Failed to load Google Sign-In. Please refresh and try again.
-                </div>
-            `;
-        }
-    }
-    
-    // REPLACE your existing triggerOneTapLogin function with this:
+
     window.triggerOneTapLogin = function() {
-        if (authState.isLoggedIn) {
-            log("User already logged in");
-            return;
-        }
-        
-        log("Manual login triggered - showing traditional login popup");
+        if (authState.isLoggedIn) return;
         showTraditionalLoginPopup();
     };
-        
-    // ========================================
-    // STARTUP SEQUENCE
-    // ========================================
-    function initializeAuthSystem() {
-        log("🚀 system initialized");
-        
-        /*
-        // Only attempt silent auth on index page
-        const isIndexPage = window.location.pathname === '/' || 
-                           window.location.pathname === '/index.php' || 
-                           window.location.pathname.endsWith('/');
-        
-        if (isIndexPage) {
-            log("📍 Index page detected - starting silent auth");
-            waitForGoogleAndStartAuth();
-        } else {
-            log("📍 Non-index page - skipping silent auth");
-            hideLoading();
-        }
-        */
-        
-        // Just hide loading since we're not doing silent auth
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', hideLoading);
+    } else {
         hideLoading();
     }
-    
-    // Start the system when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initializeAuthSystem);
-    } else {
-        initializeAuthSystem();
-    }
-    
-    log("🎯 Production-level silent authentication system loaded");
 
 })();
 

@@ -49,6 +49,7 @@ $totalPages = $productData['total_pages'];
 // Check if user is logged in
 $isLoggedIn = isLoggedIn();
 $currentUser = $isLoggedIn ? getCurrentUser() : null;
+$isLoggedIn  = $isLoggedIn && ($currentUser !== null);
 
 // Get all categories for navigation
 $categories = getAllCategories();

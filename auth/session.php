@@ -34,10 +34,14 @@ function getCurrentUser() {
         $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
         $stmt->execute([$userId]);
         
-        if ($stmt->rowCount() > 0) {
-            return $stmt->fetch();
+        $user = $stmt->fetch();
+        if ($user) {
+            return $user;
         }
-        
+
+        // User was deleted from DB — clear the stale session entry
+        unset($_SESSION['user_id']);
+        error_log("User ID {$userId} does not exist in users table");
         return null;
     } catch (Exception $e) {
         error_log("Error in getCurrentUser: " . $e->getMessage());
