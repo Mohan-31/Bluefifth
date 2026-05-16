@@ -109,568 +109,466 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invoice - <?= htmlspecialchars($order['order_number']) ?></title>
+    <title>Invoice – <?= htmlspecialchars($order['order_number']) ?></title>
+
+    <!-- PDF libs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
     <style>
-        @page {
-            size: A4 portrait;
-            margin: 10mm;
-        }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
+        /* ── reset ── */
+        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+        /* ── page setup ── */
+        @page { size: A4 portrait; margin: 12mm; }
+
         body {
-            font-family: 'Arial', sans-serif;
+            font-family: 'Courier New', Courier, monospace;
             font-size: 11px;
-            line-height: 1.4;
-            color: #333;
-            background: white;
+            line-height: 1.55;
+            color: #1a1a1a;
+            background: #F0EBE1;
+            min-height: 100vh;
         }
-        
-        .invoice-container {
-            width: 100%;
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            padding: 15px;
+
+        /* ── action bar (no-print) ── */
+        .action-bar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            background: rgba(240,235,225,.95);
+            backdrop-filter: blur(8px);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 10px 20px;
+            z-index: 100;
+            border-bottom: 1px solid #d5cfc4;
         }
-        
-        /* Header */
-        .invoice-header {
+        .action-bar button {
+            padding: 9px 20px;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .04em;
+            cursor: pointer;
+            border: 2px solid #1a1a1a;
+            transition: all .18s;
+        }
+        .btn-print  { background: transparent; color: #1a1a1a; }
+        .btn-print:hover  { background: #1a1a1a; color: #F0EBE1; }
+        .btn-dl { background: #C41930; color: #fff; border-color: #C41930; }
+        .btn-dl:hover { background: #a01226; border-color: #a01226; }
+
+        /* ── invoice wrapper ── */
+        #invoice-wrapper {
+            max-width: 780px;
+            margin: 64px auto 40px;
+            background: #F0EBE1;
+            padding: 40px 44px 36px;
+        }
+
+        /* ── top: INVOICE + company ── */
+        .inv-top {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 25px;
-            padding-bottom: 15px;
-            border-bottom: 3px solid #667eea;
+            margin-bottom: 6px;
         }
-        
-        .company-info h1 {
-            font-size: 24px;
-            color: #667eea;
-            font-weight: bold;
-            margin-bottom: 4px;
+        .inv-heading {
+            font-family: 'Arial Black', 'Arial', sans-serif;
+            font-size: 72px;
+            font-weight: 900;
+            color: #C41930;
+            letter-spacing: -.02em;
+            line-height: 1;
+            text-transform: uppercase;
         }
-        
-        .company-info p {
-            color: #666;
-            margin-bottom: 2px;
-            font-size: 10px;
-        }
-        
-        .invoice-title {
+        .inv-company {
             text-align: right;
+            padding-top: 6px;
         }
-        
-        .invoice-title h2 {
-            font-size: 28px;
-            color: #333;
-            margin-bottom: 8px;
-            font-weight: bold;
+        .inv-company-name {
+            font-family: 'Arial Black', 'Arial', sans-serif;
+            font-size: 18px;
+            font-weight: 900;
+            color: #C41930;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            line-height: 1.2;
         }
-        
-        .invoice-number {
-            background: #667eea;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-weight: bold;
-            display: inline-block;
-            font-size: 12px;
+        .inv-company-sub {
+            font-size: 10px;
+            color: #555;
+            margin-top: 4px;
         }
-        
-        /* Invoice Details */
-        .invoice-details {
+
+        /* ── divider ── */
+        .inv-rule { border: none; border-top: 1.5px solid #1a1a1a; margin: 12px 0; }
+        .inv-rule-thin { border: none; border-top: .5px solid #b0a898; margin: 10px 0; }
+
+        /* ── meta row: invoice# / address ── */
+        .inv-meta-row {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 20px;
+            align-items: flex-start;
+            margin-bottom: 6px;
         }
-        
-        .invoice-meta {
-            width: 45%;
-        }
-        
-        .customer-info {
-            width: 50%;
-            background: #f8f9fa;
-            padding: 12px;
-            border-radius: 6px;
-            border-left: 4px solid #667eea;
-            margin-left: 20px;
-        }
-        
-        .invoice-meta h3, .customer-info h3 {
-            color: #333;
-            font-size: 12px;
-            margin-bottom: 8px;
-            padding-bottom: 4px;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .invoice-meta p, .customer-info p {
-            margin-bottom: 4px;
+        .inv-meta-left { font-size: 10px; }
+        .inv-meta-left .meta-label {
+            text-transform: uppercase;
+            letter-spacing: .1em;
             color: #666;
-            font-size: 10px;
+            font-size: 9px;
         }
-        
-        /* Items Table */
-        .items-table {
+        .inv-meta-left .meta-value { font-weight: 700; font-size: 11px; }
+        .inv-meta-left .meta-row { margin-bottom: 6px; }
+        .inv-addr-right {
+            text-align: right;
+            font-size: 10px;
+            color: #444;
+            line-height: 1.6;
+            max-width: 220px;
+        }
+
+        /* ── bill-to / payment row ── */
+        .inv-bill-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin: 18px 0 14px;
+        }
+        .inv-bill-col { width: 48%; }
+        .inv-col-label {
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            font-size: 9px;
+            color: #666;
+            margin-bottom: 6px;
+            font-weight: 700;
+        }
+        .inv-bill-name { font-size: 13px; font-weight: 700; text-transform: uppercase; color: #1a1a1a; }
+        .inv-bill-detail { font-size: 10px; color: #444; line-height: 1.7; margin-top: 2px; }
+
+        /* ── items table ── */
+        .inv-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 20px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            overflow: hidden;
+            margin-bottom: 0;
         }
-        
-        .items-table thead th {
-            background: #667eea;
-            color: white;
-            padding: 8px 6px;
+        .inv-table th {
             text-align: left;
-            font-weight: bold;
-            font-size: 10px;
             text-transform: uppercase;
+            letter-spacing: .1em;
+            font-size: 9px;
+            color: #555;
+            padding: 7px 8px;
+            border-top: 1.5px solid #b0a898;
+            border-bottom: 1.5px solid #b0a898;
+            font-weight: 700;
         }
-        
-        .items-table thead th:last-child,
-        .items-table thead th:nth-child(3),
-        .items-table thead th:nth-child(4) {
-            text-align: right;
-        }
-        
-        .items-table tbody td {
-            padding: 8px 6px;
-            border-bottom: 1px solid #eee;
+        .inv-table th:not(:first-child) { text-align: right; }
+        .inv-table td {
+            padding: 8px 8px;
+            border-bottom: .5px solid #c8c0b4;
+            font-size: 10.5px;
             vertical-align: top;
-            font-size: 10px;
         }
-        
-        .items-table tbody td:last-child,
-        .items-table tbody td:nth-child(3),
-        .items-table tbody td:nth-child(4) {
-            text-align: right;
+        .inv-table td:not(:first-child) { text-align: right; }
+        .inv-table .td-name { font-weight: 600; }
+        .inv-table .td-sub { font-size: 9px; color: #777; margin-top: 2px; }
+        .inv-table .tr-empty td { padding: 6px 8px; border-bottom: .5px solid #c8c0b4; }
+
+        /* ── summary rows ── */
+        .inv-table .tr-summary td {
+            border-bottom: none;
+            padding: 4px 8px;
+            font-size: 10.5px;
         }
-        
-        .items-table tbody tr:nth-child(even) {
-            background: #f9f9f9;
-        }
-        
-        .product-name {
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 2px;
-        }
-        
-        .product-details {
-            font-size: 9px;
-            color: #666;
-        }
-        
-        /* Summary */
-        .invoice-summary {
-            display: flex;
-            justify-content: flex-end;
-            margin-bottom: 20px;
-        }
-        
-        .summary-table {
-            width: 250px;
-            border-collapse: collapse;
-        }
-        
-        .summary-table td {
-            padding: 6px 10px;
-            border-bottom: 1px solid #eee;
-            font-size: 10px;
-        }
-        
-        .summary-table td:first-child {
-            text-align: left;
-            color: #666;
-        }
-        
-        .summary-table td:last-child {
-            text-align: right;
-            font-weight: bold;
-            color: #333;
-        }
-        
-        .summary-table .total-row {
-            background: #f8f9fa;
-            border-top: 2px solid #667eea;
-            border-bottom: 2px solid #667eea;
-        }
-        
-        .summary-table .total-row td {
-            font-size: 14px;
-            font-weight: bold;
-            color: #333;
-            padding: 10px;
-        }
-        
-        .discount-row td:last-child {
-            color: #28a745 !important;
-        }
-        
-        /* Payment Info */
-        .payment-info {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            border-left: 4px solid #28a745;
-        }
-        
-        .payment-info h3 {
-            color: #28a745;
-            margin-bottom: 8px;
+        .inv-table .tr-summary td:first-child { color: #555; }
+        .inv-table .tr-summary td:last-child  { font-weight: 700; }
+        .inv-table .tr-discount td:last-child  { color: #2e7d32; }
+        .inv-table .tr-grand td {
+            padding: 8px 8px 2px;
             font-size: 12px;
-        }
-        
-        .payment-info p {
-            margin-bottom: 4px;
-            font-size: 10px;
-        }
-        
-        .payment-status {
-            display: inline-block;
-            padding: 3px 6px;
-            border-radius: 4px;
-            font-size: 9px;
-            font-weight: bold;
+            font-weight: 900;
             text-transform: uppercase;
+            letter-spacing: .06em;
+            border-top: 1.5px solid #1a1a1a;
+            border-bottom: none;
         }
-        
-        .status-paid {
-            background: #d4edda;
-            color: #155724;
+
+        /* ── footer ── */
+        .inv-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-top: 28px;
+            padding-top: 16px;
+            border-top: .5px solid #b0a898;
         }
-        
-        .status-pending {
-            background: #fff3cd;
-            color: #856404;
-        }
-        
-        /* Footer */
-        .invoice-footer {
-            border-top: 1px solid #eee;
-            padding-top: 15px;
-            text-align: center;
-        }
-        
-        .footer-note {
-            font-size: 9px;
-            color: #666;
-            margin-bottom: 8px;
-        }
-        
-        .footer-contact {
-            font-size: 10px;
-            color: #333;
-        }
-        
-        /* Print Styles */
+        .inv-footer-left { width: 55%; font-size: 9px; color: #555; line-height: 1.6; }
+        .inv-footer-left strong { font-size: 10px; color: #1a1a1a; display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .08em; }
+        .inv-footer-right { width: 40%; text-align: right; font-size: 9px; color: #555; line-height: 1.7; }
+        .inv-footer-right strong { font-size: 10px; color: #1a1a1a; display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .08em; }
+
+        /* ── print ── */
         @media print {
-            body {
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            
-            .invoice-container {
-                padding: 0;
-                margin: 0;
-                box-shadow: none;
-            }
-            
-            .no-print {
-                display: none !important;
-            }
+            body { background: #F0EBE1; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .action-bar { display: none !important; }
+            #invoice-wrapper { margin: 0; padding: 20px; }
         }
-        
-        /* Print Button */
-        .print-button {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #667eea;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-            transition: all 0.3s ease;
-            z-index: 1000;
-            font-size: 12px;
-        }
-        
-        .print-button:hover {
-            background: #5a6fd8;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
-        }
-        
-        .download-button {
-            position: fixed;
-            top: 70px;
-            right: 20px;
-            background: #28a745;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
-            transition: all 0.3s ease;
-            z-index: 1000;
-            font-size: 12px;
-        }
-        
-        .download-button:hover {
-            background: #218838;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(40, 167, 69, 0.4);
+        @media (max-width: 640px) {
+            #invoice-wrapper { padding: 20px 16px; margin-top: 58px; }
+            .inv-heading { font-size: 48px; }
+            .inv-bill-row { flex-direction: column; gap: 16px; }
+            .inv-bill-col { width: 100%; }
         }
     </style>
 </head>
 <body>
-    <button class="print-button no-print" onclick="window.print()">
-        🖨️ Print Invoice
-    </button>
-    
-    <button class="download-button no-print" onclick="downloadPDF()">
-        📄 Download PDF
-    </button>
-    
-    <div class="invoice-container">
-        <!-- Header -->
-        <div class="invoice-header">
-            <div class="company-info">
-                <h1><?= htmlspecialchars($siteName) ?></h1>
-                <p><?= htmlspecialchars($siteDescription) ?></p>
-                <p>📧 <?= htmlspecialchars($contactEmail) ?></p>
-                <p>📞 <?= htmlspecialchars($contactPhone) ?></p>
-                <p>🌐 www.bluefifth.in</p>
-            </div>
-            <div class="invoice-title">
-                <h2>INVOICE</h2>
-                <div class="invoice-number"><?= htmlspecialchars($order['order_number']) ?></div>
-            </div>
-        </div>
-        
-        <!-- Invoice Details -->
-        <div class="invoice-details">
-            <div class="invoice-meta">
-                <h3>📄 Invoice Details</h3>
-                <p><strong>Invoice Date:</strong> <?= date('M d, Y', strtotime($order['created_at'])) ?></p>
-                <p><strong>Order ID:</strong> <?= htmlspecialchars($order['id']) ?></p>
-                <p><strong>Payment Method:</strong> online payment</p>
-                <p><strong>Currency:</strong> <?= htmlspecialchars($currency) ?></p>
-            </div>
-            
-            <div class="customer-info">
-                <h3>👤 Bill To</h3>
-                <p><strong><?= htmlspecialchars($order['customer_name'] ?? 'Guest Customer') ?></strong></p>
-                <p>📧 <?= htmlspecialchars($order['customer_email'] ?? 'N/A') ?></p>
-                <p>📞 <?= htmlspecialchars($customerPhone) ?></p>
-                <br>
-                <p><strong>📦 Shipping Address:</strong></p>
-                <p><?= htmlspecialchars($addressString) ?></p>
+
+    <!-- Action bar -->
+    <div class="action-bar no-print">
+        <button class="btn-print" onclick="window.print()">🖨 Print</button>
+        <button class="btn-dl" id="download-btn" onclick="downloadInvoicePDF()">⬇ Download PDF</button>
+    </div>
+
+    <!-- Invoice body -->
+    <div id="invoice-wrapper">
+
+        <!-- Top: big INVOICE + company name -->
+        <div class="inv-top">
+            <div class="inv-heading">Invoice</div>
+            <div class="inv-company">
+                <div class="inv-company-name"><?= htmlspecialchars(strtoupper($siteName)) ?></div>
+                <div class="inv-company-sub">
+                    www.bluefifth.in<br>
+                    <?= htmlspecialchars($contactEmail) ?><br>
+                    <?= htmlspecialchars($contactPhone) ?>
+                </div>
             </div>
         </div>
-        
-        <!-- Items Table -->
-        <table class="items-table">
+
+        <hr class="inv-rule">
+
+        <!-- Meta: invoice number / date  ||  company address -->
+        <div class="inv-meta-row">
+            <div class="inv-meta-left">
+                <div class="meta-row">
+                    <div class="meta-label">Invoice Number</div>
+                    <div class="meta-value"><?= htmlspecialchars($order['order_number']) ?></div>
+                </div>
+                <div class="meta-row">
+                    <div class="meta-label">Date</div>
+                    <div class="meta-value"><?= date('F j, Y', strtotime($order['created_at'])) ?></div>
+                </div>
+                <div class="meta-row">
+                    <div class="meta-label">Payment</div>
+                    <div class="meta-value" style="text-transform:uppercase;"><?= htmlspecialchars($order['payment_status']) ?></div>
+                </div>
+            </div>
+            <div class="inv-addr-right">
+                CIN: U13999TZ2021PTC037885<br>
+                GSTIN: 33AAJCT0905H2ZK<br>
+                <?= htmlspecialchars($siteDescription) ?>
+            </div>
+        </div>
+
+        <hr class="inv-rule-thin">
+
+        <!-- Bill To  ||  Payment Method -->
+        <div class="inv-bill-row">
+            <div class="inv-bill-col">
+                <div class="inv-col-label">Bill To</div>
+                <div class="inv-bill-name"><?= htmlspecialchars($order['customer_name'] ?? 'Guest Customer') ?></div>
+                <div class="inv-bill-detail">
+                    <?= htmlspecialchars($addressString) ?><br>
+                    <?= htmlspecialchars($order['customer_email'] ?? '') ?><br>
+                    <?= htmlspecialchars($customerPhone) ?>
+                </div>
+            </div>
+            <div class="inv-bill-col" style="text-align:right;">
+                <div class="inv-col-label" style="text-align:right;">Payment Method</div>
+                <div class="inv-bill-name" style="font-size:12px;">
+                    <?php
+                        $payMethod = 'Online Payment';
+                        if (!empty($order['payment_method'])) {
+                            $payMethod = ucwords(str_replace('_', ' ', $order['payment_method']));
+                        } elseif (!empty($order['razorpay_payment_id'])) {
+                            $payMethod = 'Razorpay';
+                        } elseif (strtolower($order['payment_status'] ?? '') === 'cod') {
+                            $payMethod = 'Cash on Delivery';
+                        }
+                        echo htmlspecialchars($payMethod);
+                    ?>
+                </div>
+                <div class="inv-bill-detail" style="text-align:right;">
+                    <?php if (!empty($order['razorpay_payment_id'])): ?>
+                        Txn: <?= htmlspecialchars($order['razorpay_payment_id']) ?><br>
+                    <?php endif; ?>
+                    <?= date('F j, Y', strtotime($order['created_at'])) ?>
+                </div>
+            </div>
+        </div>
+
+        <!-- Items table -->
+        <?php
+        $taxRate2       = (float) getSetting('tax_rate', 18.0);
+        $calculatedTax  = (float) ($order['tax_amount'] ?? 0);
+        ?>
+        <table class="inv-table">
             <thead>
                 <tr>
-                    <th>Product Description</th>
-                    <th style="width: 60px;">Qty</th>
-                    <th style="width: 80px;">Unit Price</th>
-                    <th style="width: 80px;">Total</th>
+                    <th style="width:52%;">Description</th>
+                    <th style="width:10%;">Qty</th>
+                    <th style="width:19%;">Price</th>
+                    <th style="width:19%;">Subtotal</th>
                 </tr>
             </thead>
             <tbody>
                 <?php foreach ($orderItems as $item): ?>
                 <tr>
                     <td>
-                        <div class="product-name"><?= htmlspecialchars($item['product_name']) ?></div>
-                        <div class="product-details">
-                            <?php if (!empty($item['size'])): ?>
-                                Size: <?= htmlspecialchars($item['size']) ?><br>
-                            <?php endif; ?>
-                            <?php if (!empty($item['hsn_code'])): ?>
-                                HSN Code: <?= htmlspecialchars($item['hsn_code']) ?>
-                            <?php endif; ?>
+                        <div class="td-name"><?= htmlspecialchars($item['product_name']) ?></div>
+                        <div class="td-sub">
+                            <?= !empty($item['size'])     ? 'Size: ' . htmlspecialchars($item['size'])     : '' ?>
+                            <?= !empty($item['hsn_code']) ? ' | HSN: ' . htmlspecialchars($item['hsn_code']) : '' ?>
                         </div>
                     </td>
-
-                    <td><?= $item['quantity'] ?></td>
+                    <td><?= (int)$item['quantity'] ?></td>
                     <td><?= $currencySymbol ?><?= number_format($item['product_price'], 2) ?></td>
-                    <td><?= $currencySymbol ?><?= number_format($item['total_price'], 2) ?></td>
+                    <td><?= $currencySymbol ?><?= number_format($item['total_price'],   2) ?></td>
                 </tr>
                 <?php endforeach; ?>
-            </tbody>
-        </table>
-        
-        <!-- Summary -->
-        <div class="invoice-summary">
-            <table class="summary-table">
-                <?php 
-                // Calculate tax-exclusive subtotal dynamically
-                $taxRate = (float) getSetting('tax_rate', 18.0);
-                $taxExclusiveSubtotal = $order['total_amount'];
-                $calculatedTax = $order['tax_amount'] ?? 0;
-                
-                // If tax exists, calculate the tax-exclusive amount
-                if ($calculatedTax > 0) {
-                    $taxExclusiveSubtotal = $order['total_amount'] - $calculatedTax;
-                }
-                ?>
-                
-                <?php if ($order['is_combo_applied']): ?>
-                <!-- Combo Pricing Display -->
-                <tr>
-                    <td>Regular Subtotal:</td>
-                    <td style="text-decoration: line-through; color: #999;"><?= $currencySymbol ?><?= number_format($order['total_amount'] + ($order['combo_savings'] ?? 0), 2) ?></td>
-                </tr>
-                <tr class="discount-row">
-                    <td>🎉 Combo Discount 
-                        <?php if ($order['combo_type'] == '3_for_1199'): ?>
-                            (3 for ₹1199):
-                        <?php else: ?>
-                            (5 for ₹1699):
-                        <?php endif; ?>
-                    </td>
-                    <td>-<?= $currencySymbol ?><?= number_format($order['combo_savings'], 2) ?></td>
-                </tr>
-                <tr>
-                    <td>After Combo Subtotal:</td>
+
+                <!-- Visual spacing rows -->
+                <tr class="tr-empty"><td colspan="4" style="height:14px;"></td></tr>
+
+                <!-- Summary rows -->
+                <tr class="tr-summary">
+                    <td colspan="3">Subtotal</td>
                     <td><?= $currencySymbol ?><?= number_format($order['total_amount'], 2) ?></td>
                 </tr>
-                <?php else: ?>
-                <!-- Regular Pricing -->
-                <tr>
-                    <td>After Combo Subtotal:</td>
-                    <td><?= $currencySymbol ?><?= number_format($order['total_amount'], 2) ?></td>
-                </tr>
-                <?php endif; ?>
-                
+
                 <?php if (isset($order['coupon_code']) && !empty($order['coupon_code'])): ?>
-                <!-- Coupon Discount Display -->
-                <tr class="discount-row">
-                    <td>💰 Coupon Discount (<?= htmlspecialchars($order['coupon_code']) ?> - <?= $order['coupon_discount_percentage'] ?>%):</td>
+                <tr class="tr-summary tr-discount">
+                    <td colspan="3">Coupon (<?= htmlspecialchars($order['coupon_code']) ?> <?= $order['coupon_discount_percentage'] ?>%)</td>
                     <td>-<?= $currencySymbol ?><?= number_format($order['coupon_discount_amount'], 2) ?></td>
                 </tr>
                 <?php endif; ?>
-                
-                <?php if (isset($order['tax_amount']) && $order['tax_amount'] > 0): ?>
-                <tr>
-                    <td>Tax (<?= $taxRate ?>%):</td>
+
+                <?php if ($calculatedTax > 0): ?>
+                <tr class="tr-summary">
+                    <td colspan="3">Tax (<?= $taxRate2 ?>% GST)</td>
                     <td><?= $currencySymbol ?><?= number_format($calculatedTax, 2) ?></td>
                 </tr>
                 <?php endif; ?>
-                
+
                 <?php if (isset($order['shipping_amount']) && $order['shipping_amount'] > 0): ?>
-                <tr>
-                    <td>Shipping:</td>
+                <tr class="tr-summary">
+                    <td colspan="3">Shipping</td>
                     <td><?= $currencySymbol ?><?= number_format($order['shipping_amount'], 2) ?></td>
                 </tr>
                 <?php else: ?>
-                <tr>
-                    <td>Shipping:</td>
-                    <td style="color: #28a745;">FREE</td>
+                <tr class="tr-summary">
+                    <td colspan="3">Shipping</td>
+                    <td style="color:#2e7d32;">Free</td>
                 </tr>
                 <?php endif; ?>
-                
-                <?php if (isset($order['wallet_points_used']) && $order['wallet_points_used'] > 0): ?>
-                <tr class="discount-row">
-                    <td>💰 Wallet Discount:</td>
+
+                <?php if (!empty($order['wallet_points_used']) && $order['wallet_points_used'] > 0): ?>
+                <tr class="tr-summary tr-discount">
+                    <td colspan="3">Wallet Discount</td>
                     <td>-<?= $currencySymbol ?><?= number_format($order['wallet_points_used'], 2) ?></td>
                 </tr>
                 <?php endif; ?>
-                
-                <tr class="total-row">
-                    <td>TOTAL PAID:</td>
+
+                <tr class="tr-grand">
+                    <td colspan="3">Grand Total</td>
                     <td><?= $currencySymbol ?><?= number_format($order['final_amount'], 2) ?></td>
                 </tr>
-            </table>
-        </div>   
-                
-        <!-- Payment Info -->
-        <div class="payment-info">
-            <h3>💳 Payment Information</h3>
-            <p><strong>Payment Status:</strong> 
-                <span class="payment-status status-<?= strtolower($order['payment_status']) ?>">
-                    <?= strtoupper($order['payment_status']) ?>
-                </span>
-            </p>
-            <p><strong>Transaction ID:</strong> <?= htmlspecialchars($order['razorpay_payment_id'] ?? 'N/A') ?></p>
-            <p><strong>Payment Date:</strong> <?= date('M d, Y', strtotime($order['created_at'])) ?></p>
-            
-            <?php if ($order['is_combo_applied']): ?>
-                <p><strong>🎉 Special Offer Applied:</strong> 
-                    <?php if ($order['combo_type'] == '3_for_1199'): ?>
-                        3 Products Combo (₹1199) - Saved ₹<?= number_format($order['combo_savings'], 2) ?>
-                    <?php else: ?>
-                        5 Products Combo (₹1699) - Saved ₹<?= number_format($order['combo_savings'], 2) ?>
-                    <?php endif; ?>
-                </p>
-            <?php endif; ?>
-            
-            <?php if (isset($order['coupon_code']) && !empty($order['coupon_code'])): ?>
-                <p><strong>💰 Coupon Applied:</strong> 
-                    <?= htmlspecialchars($order['coupon_code']) ?> (<?= $order['coupon_discount_percentage'] ?>% off) - Saved ₹<?= number_format($order['coupon_discount_amount'], 2) ?>
-                </p>
-            <?php endif; ?>
-            
-            <?php if (!empty($order['referral_code'])): ?>
-                <p><strong>Referral Code Used:</strong> <?= htmlspecialchars($order['referral_code']) ?></p>
-            <?php endif; ?>
-        </div>
-        
+            </tbody>
+        </table>
+
         <!-- Footer -->
-        <div class="invoice-footer">
-            <p class="footer-note">
-                <strong>Thank you for your business!</strong><br>
-                CIN: U13999TZ2021PTC037885<br>
-                GSTIN: 33AAJCT0905H2ZK<br>
-                This is a computer-generated invoice. If you have any questions, please contact us.
-            </p>
-            <p class="footer-contact">
-                <?= htmlspecialchars($siteName) ?> | <?= htmlspecialchars($contactEmail) ?> | <?= htmlspecialchars($contactPhone) ?><br>
-                © <?= date('Y') ?> <?= htmlspecialchars($siteName) ?>. All rights reserved.
-            </p>
+        <div class="inv-footer">
+            <div class="inv-footer-left">
+                <strong>Terms &amp; Conditions</strong>
+                All sales are final. Refunds are subject to our return policy. This is a
+                computer-generated invoice and does not require a physical signature.
+                For disputes, please contact us within 7 days of delivery.
+                <?php if (!empty($order['referral_code'])): ?>
+                  <br>Referral code used: <strong><?= htmlspecialchars($order['referral_code']) ?></strong>
+                <?php endif; ?>
+            </div>
+            <div class="inv-footer-right">
+                <strong>For any questions</strong>
+                <?= htmlspecialchars($contactEmail) ?><br>
+                <?= htmlspecialchars($contactPhone) ?><br>
+                www.bluefifth.in<br><br>
+                <?= htmlspecialchars($siteName) ?><br>
+                © <?= date('Y') ?> All rights reserved.
+            </div>
         </div>
-    </div>
-    
+
+    </div><!-- /#invoice-wrapper -->
+
     <script>
-        // Download PDF functionality (using browser's print to PDF)
-        function downloadPDF() {
-            // Hide print buttons
-            const printButtons = document.querySelectorAll('.no-print');
-            printButtons.forEach(btn => btn.style.display = 'none');
-            
-            // Trigger print dialog
-            window.print();
-            
-            // Show buttons again after print dialog
-            setTimeout(() => {
-                printButtons.forEach(btn => btn.style.display = 'block');
-            }, 1000);
+        async function downloadInvoicePDF() {
+            const btn = document.getElementById('download-btn');
+            btn.textContent = '⏳ Generating…';
+            btn.disabled = true;
+
+            // Hide action bar so it doesn't appear in the PDF
+            const bar = document.querySelector('.action-bar');
+            bar.style.visibility = 'hidden';
+
+            try {
+                const el = document.getElementById('invoice-wrapper');
+                const canvas = await html2canvas(el, {
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#F0EBE1',
+                    logging: false
+                });
+
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+                const pdfW  = pdf.internal.pageSize.getWidth();
+                const pdfH  = pdf.internal.pageSize.getHeight();
+                const ratio = canvas.height / canvas.width;
+                const imgH  = pdfW * ratio;
+
+                const imgData = canvas.toDataURL('image/jpeg', 0.93);
+
+                if (imgH <= pdfH) {
+                    pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, imgH);
+                } else {
+                    // Multi-page support
+                    let posY = 0;
+                    while (posY < imgH) {
+                        if (posY > 0) pdf.addPage();
+                        pdf.addImage(imgData, 'JPEG', 0, -posY, pdfW, imgH);
+                        posY += pdfH;
+                    }
+                }
+
+                pdf.save('Invoice-<?= htmlspecialchars($order['order_number']) ?>.pdf');
+            } catch (err) {
+                console.error(err);
+                alert('Could not generate PDF. Please use the Print button and choose "Save as PDF".');
+            } finally {
+                bar.style.visibility = '';
+                btn.textContent = '⬇ Download PDF';
+                btn.disabled = false;
+            }
         }
-        
-        // Auto-print functionality (optional)
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('auto_print') === '1') {
-            setTimeout(() => {
-                window.print();
-            }, 1000);
+
+        // Auto-print when ?auto_print=1
+        if (new URLSearchParams(location.search).get('auto_print') === '1') {
+            setTimeout(() => window.print(), 800);
         }
     </script>
 </body>

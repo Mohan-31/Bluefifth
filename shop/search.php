@@ -508,7 +508,7 @@ $seoDescription = "Search results for '" . htmlspecialchars($searchQuery) . "' -
     <?php include '../includes/navbar.php'; ?>
 
 <!-- Search Header -->
-    <div class="search-header">
+    <div class="search-header nav-align">
         <div class="container">
             <div class="row">
                 <div class="col-12">
@@ -1308,9 +1308,6 @@ $seoDescription = "Search results for '" . htmlspecialchars($searchQuery) . "' -
             to { opacity: 1; transform: translateY(0); }
         }
     </style>
-    <!-- Google Sign-In Script -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-
     <!-- SIMPLIFIED AUTH FOR NON-INDEX PAGES (ADD THIS) -->
     <script>
     (function() {

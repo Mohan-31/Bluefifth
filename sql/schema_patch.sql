@@ -16,9 +16,17 @@ ALTER TABLE `wallet_transactions`
   MODIFY COLUMN `transaction_type`
     ENUM('earned','used','claimed','bonus','held') NOT NULL;
 
+-- 3. categories: add hsn_code column
+--    (invoice.php and manage-categories.php reference c.hsn_code — missing column)
+ALTER TABLE `categories`
+  ADD COLUMN IF NOT EXISTS `hsn_code` VARCHAR(20) NULL DEFAULT NULL AFTER `description`;
+
 -- Verify
 SELECT 'referral_purchases columns:' AS info;
 DESCRIBE referral_purchases;
 
 SELECT 'wallet_transactions.transaction_type:' AS info;
 SHOW COLUMNS FROM wallet_transactions LIKE 'transaction_type';
+
+SELECT 'categories.hsn_code:' AS info;
+SHOW COLUMNS FROM categories LIKE 'hsn_code';

@@ -624,26 +624,18 @@ $finalTotal = $totalAmount + $shippingCost;
         .img-responsive{
     width:150px;
     }
-    .nav-align{
-        margin-top:150px;
-    }
+
     /* Tablet View (min-width: 768px) */
     @media (min-width: 768px) {
     .img-responsive{
         width:150px;
     }
-    .nav-align{
-        margin-top:100px;
     }
-    }
-    
+
     /* Laptop/Desktop View (min-width: 1024px or 1200px) */
     @media (min-width: 1024px) {
     .img-responsive{
         width:200px;
-    }
-    .nav-align{
-        margin-top:250px;
     }
     }
 
@@ -1218,8 +1210,6 @@ $finalTotal = $totalAmount + $shippingCost;
     <!-- Scripts -->
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-
     <script>
     // SIMPLIFIED AUTH FOR NON-INDEX PAGES
         (function() {
@@ -2296,8 +2286,11 @@ function shareLinkViaWebShare() {
 
         // Initialize page
         document.addEventListener('DOMContentLoaded', function() {
-            // Initialize guest cart backup system for guests
-            <?php if (!$isLoggedIn): ?>
+            <?php if ($isLoggedIn): ?>
+                // Logged-in user — purge any lingering guest backup so it never bleeds over
+                try { localStorage.removeItem('guest_cart_backup'); } catch(e) {}
+            <?php else: ?>
+                // Guest — enable localStorage backup
                 loadGuestCartFromStorage();
                 autoSaveGuestCart();
             <?php endif; ?>

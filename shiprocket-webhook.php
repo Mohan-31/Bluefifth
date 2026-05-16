@@ -2,11 +2,10 @@
 // shiprocket-webhook.php - Place this in ROOT directory like return-webhook.php
 require_once __DIR__ . "/includes/database.php";
 require_once __DIR__ . "/includes/functions.php";
+require_once __DIR__ . "/includes/config.php";
 
-// -----------------------------
-// CONFIG - Match your return webhook exactly
-// -----------------------------
-$expectedToken = "BFOrder2025\$SecretKey"; // Order webhook token
+// Token defined in includes/config.php (SHIPROCKET_ORDER_WEBHOOK_TOKEN)
+$expectedToken = SHIPROCKET_ORDER_WEBHOOK_TOKEN;
 
 // -----------------------------
 // FORCE CREATE LOGS FOLDER

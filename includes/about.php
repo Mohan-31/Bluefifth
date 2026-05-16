@@ -494,16 +494,10 @@ $siteName = 'Bluefifth';
         .img-responsive{
             width:120px;
         }
-        .nav-align{
-            margin-top:80px;
-        }
-                /* Tablet View (min-width: 768px) */
+        /* Tablet View (min-width: 768px) */
         @media (min-width: 768px) {
         .img-responsive{
             width:120px;
-        }
-        .nav-align{
-            margin-top:80px;
         }
         }
 
@@ -512,9 +506,6 @@ $siteName = 'Bluefifth';
         .img-responsive{
             width:200px;
             margin-left:110px;
-        }
-        .nav-align{
-            margin-top:165px;
         }
         }
         
@@ -1867,9 +1858,6 @@ if (currentUser) {
 
 console.log('🎉 Complete integrated authentication and shopping system loaded');
 </script>
-
-    <!-- Google Sign-In Script -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <!-- JAVASCRIPT -->
     <script>

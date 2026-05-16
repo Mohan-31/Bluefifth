@@ -1,7 +1,4 @@
-
-<html>
-
-<body>
+<?php if (!defined('TIMER_BANNER_SHOWN')) { define('TIMER_BANNER_SHOWN', true); ?>
 <!-- First banner -->
 <div id="timer-banner" 
      class="fixed-top"
@@ -63,5 +60,4 @@
   // Start on load
   startCountdown();
 </script>
-</body>
-</html>
+<?php } ?>

@@ -385,16 +385,10 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
             width:120px;
             margin-left:20px;
         }
-        .nav-align{
-            margin-top:110px;
-        }
         /* Tablet View (min-width: 768px) */
         @media (min-width: 768px) {
         .img-responsive{
             width:120px;
-        }
-        .nav-align{
-            margin-top:0px;
         }
         }
 
@@ -403,9 +397,6 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
         .img-responsive{
             width:200px;
             margin-left:110px;
-        }
-        .nav-align{
-            margin-top:160px;
         }
         }
         
@@ -423,7 +414,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
         
         /* Default (mobile first) */
         .banner-bg {
-            background-image: url('banner-head-mob.png');
+            background-image: url('/ecommerce-project/assets/images/banner-head-mob.png');
             width: 100vw;
             height: auto;
             background-size: cover;
@@ -436,7 +427,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
         /* Tablet and above (≥768px) */
         @media (min-width: 768px) {
             .banner-bg {
-                background-image: url('banner-head2.png');
+                background-image: url('/ecommerce-project/assets/images/banner-head2.png');
                 background-repeat: no-repeat;
                 background-position: center;
                 background-size: contain;

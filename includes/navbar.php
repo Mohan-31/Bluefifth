@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/timer.php';
 // navbar.php - Unified Navigation Component
 // This file should be created in your includes/ folder
 
@@ -74,7 +75,91 @@ $basePath = '/ecommerce-project/';
             border-radius: 3px;
         }
 
-        
+        /* ── Popup overlay & modals (used from every page) ── */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            display: none;
+        }
+        .modal-overlay.show { display: block; }
+
+        .popup-modal {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            z-index: 2500;
+            min-width: 600px;
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow-y: auto;
+            display: none;
+        }
+        .popup-modal.show { display: block; }
+
+        @media (max-width: 768px) {
+            .popup-modal { min-width: 95vw; margin: 1rem; }
+        }
+
+        .popup-close {
+            position: absolute;
+            top: 15px; right: 20px;
+            background: none; border: none;
+            font-size: 24px; cursor: pointer;
+            color: #999;
+            width: 30px; height: 30px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+        .popup-close:hover { color: #333; background: #f8f9fa; }
+
+        .popup-header {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .popup-header h3 { margin: 0; color: #333; font-weight: 600; }
+
+        /* ── Auth loading spinner ── */
+        .auth-loading {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255,255,255,0.95);
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            z-index: 3000;
+            text-align: center;
+            display: none;
+        }
+        .auth-loading.show { display: block; }
+
+        .spinner {
+            width: 40px; height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #000;
+            border-radius: 50%;
+            animation: navbarSpin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        @keyframes navbarSpin {
+            0%   { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* ── Body offset for fixed navbar ──
+           mobile / tablet (collapsed 1-row nav): 48px banners + ~62px nav  = 110px
+           desktop (≥992px, 2-row expanded nav):  48px banners + ~112px nav = 160px  */
+        .nav-align { margin-top: 130px; }
+        @media (min-width: 992px) { .nav-align { margin-top: 185px; } }
 
 </style>
 <!-- Silent Authentication Loading -->
@@ -607,6 +692,87 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 console.log('🔍 Navbar search functionality loaded');
+
+// ============================================================================
+// POPUP & AUTH FUNCTIONS — fallback implementations for every page.
+// Pages that need richer behaviour (index.php, profile.php) override these
+// by re-declaring the same function names in their own <script> block.
+// ============================================================================
+
+// Hide auth-loading spinner as soon as DOM is ready
+(function () {
+    function _hideAuthLoading() {
+        var el = document.getElementById('auth-loading');
+        if (el) el.classList.remove('show');
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _hideAuthLoading);
+    } else {
+        _hideAuthLoading();
+    }
+}());
+
+function closeAllPopups() {
+    ['modal-overlay','referral-popup','wallet-popup','traditional-login-popup'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.classList.remove('show');
+    });
+}
+
+function showTraditionalLoginPopup() {
+    var overlay = document.getElementById('modal-overlay');
+    var popup   = document.getElementById('traditional-login-popup');
+    if (overlay) overlay.classList.add('show');
+    if (popup)   popup.classList.add('show');
+}
+
+function triggerOneTapLogin() {
+    showTraditionalLoginPopup();
+}
+
+function showReferralPopup() {
+    var overlay = document.getElementById('modal-overlay');
+    var popup   = document.getElementById('referral-popup');
+    if (overlay) overlay.classList.add('show');
+    if (popup)   popup.classList.add('show');
+    // Default guest content — pages that load real data override this function
+    var content = document.getElementById('referral-content');
+    if (content && content.querySelector('.spinner')) {
+        content.innerHTML = '<div style="text-align:center;padding:2rem;color:#666;">Login via checkout to view your referrals.</div>';
+    }
+}
+
+function showWalletPopup() {
+    var overlay = document.getElementById('modal-overlay');
+    var popup   = document.getElementById('wallet-popup');
+    if (overlay) overlay.classList.add('show');
+    if (popup)   popup.classList.add('show');
+    // Default guest content — pages that load real data override this function
+    var content = document.getElementById('wallet-content');
+    if (content && content.querySelector('.spinner')) {
+        content.innerHTML = '<div style="text-align:center;padding:2rem;color:#666;">Login via checkout to view your wallet.</div>';
+    }
+}
+
+function logoutUser() {
+    if (!confirm('Are you sure you want to logout?')) return;
+    fetch('/ecommerce-project/auth/logout.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+        if (typeof showNotification === 'function') {
+            showNotification(data.cart_preserved
+                ? 'Logged out. ' + (data.cart_item_count || 0) + ' cart items preserved.'
+                : 'Logged out successfully.', 'success');
+        }
+        setTimeout(function(){ window.location.reload(); }, 800);
+    })
+    .catch(function() {
+        window.location.reload();
+    });
+}
 
 // ============================================================================
 // SCROLL-HIDE / SCROLL-REVEAL NAVBAR

@@ -3,11 +3,10 @@
 
 require_once __DIR__ . "/includes/database.php";
 require_once __DIR__ . "/includes/functions.php";
+require_once __DIR__ . "/includes/config.php";
 
-// -----------------------------
-// CONFIG
-// -----------------------------
-$expectedToken = "BFReturn2025\$SecretKey"; // Shiprocket secret token
+// Token defined in includes/config.php (SHIPROCKET_RETURN_WEBHOOK_TOKEN)
+$expectedToken = SHIPROCKET_RETURN_WEBHOOK_TOKEN;
 
 // -----------------------------
 // FORCE CREATE LOGS FOLDER

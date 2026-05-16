@@ -21,16 +21,14 @@ define('ADMIN_EMAIL', 'velonauk@gmail.com');
 // define('GOOGLE_REDIRECT_URI',  BASE_URL . '/auth/google-callback.php');
 
 // ============================================================
-// MSG91 — OTP Service
-// Sign up at https://msg91.com — get your Auth Key from
-// API > Auth Key in the MSG91 dashboard.
-// Set MSG91_AUTH_KEY to 'dev' (or leave empty) for mock mode:
-//   mock mode accepts OTP 123456 for any number (no SMS sent).
-// DLT template registration required for production in India.
+// RAZORPAY MAGIC CHECKOUT
+// Keys are stored in the database settings table (admin > settings).
+// The constants below are NOT used directly — getSetting() reads
+// from the DB at runtime so keys can be changed without a deploy.
+// RAZORPAY_KEY_ID    — rzp_test_xxx  or  rzp_live_xxx
+// RAZORPAY_KEY_SECRET — secret key
 // ============================================================
-define('MSG91_AUTH_KEY',    getenv('MSG91_AUTH_KEY')    ?: 'dev');
-define('MSG91_TEMPLATE_ID', getenv('MSG91_TEMPLATE_ID') ?: '');
-define('MSG91_SENDER_ID',   getenv('MSG91_SENDER_ID')   ?: 'BLUEFTH');
+// (Razorpay keys managed via admin settings panel — no constants needed here)
 
 // ============================================================
 // REFERRAL SYSTEM
@@ -38,6 +36,17 @@ define('MSG91_SENDER_ID',   getenv('MSG91_SENDER_ID')   ?: 'BLUEFTH');
 
 define('REFERRAL_POINT_PERCENT', 5);   // 5 % of purchase value becomes points
 define('MIN_POINTS_TO_CLAIM',   100);  // minimum ₹ equivalent before claim allowed
+
+// ============================================================
+// SHIPROCKET WEBHOOK TOKENS
+// Set these via environment variables on production.
+// Register webhook URLs in Shiprocket dashboard:
+//   Order updates: https://yourdomain.com/ecommerce-project/shiprocket-webhook.php
+//   Returns:       https://yourdomain.com/ecommerce-project/return_webhook.php
+// Shiprocket sends the token in the X-API-Key header.
+// ============================================================
+define('SHIPROCKET_ORDER_WEBHOOK_TOKEN',  getenv('SHIPROCKET_ORDER_WEBHOOK_TOKEN')  ?: 'BFOrder2025$SecretKey');
+define('SHIPROCKET_RETURN_WEBHOOK_TOKEN', getenv('SHIPROCKET_RETURN_WEBHOOK_TOKEN') ?: 'BFReturn2025$SecretKey');
 
 // ============================================================
 // UPLOAD PATHS

@@ -506,16 +506,10 @@ if (isset($_POST['save_profile'])) {
         .img-responsive{
             width:120px;
         }
-        .nav-align{
-            margin-top:160px;
-        }
-                /* Tablet View (min-width: 768px) */
+        /* Tablet View (min-width: 768px) */
         @media (min-width: 768px) {
         .img-responsive{
             width:120px;
-        }
-        .nav-align{
-            margin-top:200px;
         }
         }
 
@@ -524,9 +518,6 @@ if (isset($_POST['save_profile'])) {
         .img-responsive{
             width:200px;
             margin-left:110px;
-        }
-        .nav-align{
-            margin-top:230px;
         }
         }
         .doc-img {

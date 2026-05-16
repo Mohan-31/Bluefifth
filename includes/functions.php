@@ -7862,8 +7862,6 @@ function getOrderReturnStatus($orderId) {
  * @return array Cart items with product details
  */
 function getSessionCartItems() {
-    error_log("=== getSessionCartItems() DEBUG START ===");
-    
     if (session_status() === PHP_SESSION_NONE) {
         session_start();
     }
@@ -7879,25 +7877,22 @@ function getSessionCartItems() {
             $product = getProductById($item['product_id'], false);
             
             if ($product && $product['status'] === 'active') {
-                // IMPROVED IMAGE LOADING
+                // Get primary image — same raw URL the logged-in cart query returns
                 $primaryImage = null;
-                
-                // Try multiple ways to get the image
+
                 if (!empty($product['primary_image'])) {
                     $primaryImage = $product['primary_image'];
                 } else {
-                    // Fallback: Get from product_images table
                     try {
                         $conn = getConnection();
                         $stmt = $conn->prepare("
-                            SELECT image_url 
-                            FROM product_images 
-                            WHERE product_id = ? AND is_primary = TRUE 
+                            SELECT image_url
+                            FROM product_images
+                            WHERE product_id = ? AND is_primary = 1
                             LIMIT 1
                         ");
                         $stmt->execute([$item['product_id']]);
                         $imageResult = $stmt->fetch();
-                        
                         if ($imageResult) {
                             $primaryImage = $imageResult['image_url'];
                         }
@@ -7905,34 +7900,10 @@ function getSessionCartItems() {
                         error_log("Error loading product image: " . $e->getMessage());
                     }
                 }
-                
-                // Fix image path - remove duplicate referral-system if present
-                if ($primaryImage) {
-                    // Remove any leading slashes or duplicate paths
-                    $primaryImage = ltrim($primaryImage, '/');
-                    
-                    // Remove duplicate referral-system path if present
-                    if (str_starts_with($primaryImage, 'referral-system/')) {
-                        $primaryImage = substr($primaryImage, strlen('referral-system/'));
-                    }
-                    
-                    // Remove duplicate ../referral-system/ if present
-                    if (str_starts_with($primaryImage, '../referral-system/')) {
-                        $primaryImage = substr($primaryImage, strlen('../referral-system/'));
-                    }
-                    
-                    // Ensure correct relative path for cart.php (which is in shop/ folder)
-                    if (!str_starts_with($primaryImage, 'http') && !str_starts_with($primaryImage, '../')) {
-                        $primaryImage = '../' . $primaryImage;
-                    }
-                }
-                
-                // Fallback to default image
+
                 if (empty($primaryImage)) {
-                    $primaryImage = '../assets/images/default-product.jpg';
+                    $primaryImage = '/ecommerce-project/assets/images/default-product.jpg';
                 }
-                
-                error_log("Product ID {$item['product_id']} image: " . ($primaryImage ?: 'NONE'));
                 
                 $cartItems[] = [
                     'cart_key' => $cartKey,
@@ -8101,76 +8072,7 @@ function associateGuestOrdersWithUser($userId, $userEmail) {
     }
 }
 
-/**
- * Calculate combo pricing for cart
- */
-function calculateComboPrice($itemCount, $regularTotal) {
-    $combo3Price = (float) getSetting('combo_3_price', 1199);
-    $combo5Price = (float) getSetting('combo_5_price', 1699);
-    $enableCombo = (bool) getSetting('enable_combo_offers', true);
-    
-    if (!$enableCombo) {
-        return [
-            'total' => $regularTotal,
-            'is_combo' => false,
-            'combo_type' => null,
-            'savings' => 0
-        ];
-    }
-    
-    $result = [
-        'regular_total' => $regularTotal,
-        'is_combo' => false,
-        'combo_type' => null,
-        'savings' => 0,
-        'total' => $regularTotal
-    ];
-    
-    if ($itemCount == 3) {
-        $result['is_combo'] = true;
-        $result['combo_type'] = '3_for_1199';
-        $result['total'] = $combo3Price;
-        $result['savings'] = max(0, $regularTotal - $combo3Price);
-    } elseif ($itemCount == 5) {
-        $result['is_combo'] = true;
-        $result['combo_type'] = '5_for_1699';
-        $result['total'] = $combo5Price;
-        $result['savings'] = max(0, $regularTotal - $combo5Price);
-    }
-    
-    return $result;
-}
 
-/**
- * Get combo offer reminder message
- */
-function getComboReminderMessage($itemCount) {
-    if ($itemCount == 1) {
-        return "You are going to miss this Combo Offer! Add 2 more products to buy 3 products for ₹1199.";
-    } elseif ($itemCount == 2) {
-        return "You are going to miss this Combo Offer! Add 1 more product to buy 3 products for ₹1199.";
-    } elseif ($itemCount == 4) {
-        return "You are going to miss this Combo Offer! Add 1 more product to buy 5 products for ₹1699.";
-    }
-    return null;
-}
-
-/**
- * Update cart summary functions to include combo pricing
- */
-function getCartSummaryWithCombo($userId) {
-    $summary = getCartSummary($userId);
-    $comboResult = calculateComboPrice($summary['item_count'], $summary['total_amount']);
-    
-    return array_merge($summary, $comboResult);
-}
-
-function getSessionCartSummaryWithCombo() {
-    $summary = getSessionCartSummary();
-    $comboResult = calculateComboPrice($summary['item_count'], $summary['total_amount']);
-    
-    return array_merge($summary, $comboResult);
-}
 
 // ============================================================================
 // END OF FILE

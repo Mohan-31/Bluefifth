@@ -24,6 +24,9 @@ if (isset($_SESSION['applied_coupon']) && (!isset($_POST['apply_coupon']) && !is
 // ========================================
 $razorpayKeyId = getSetting('razorpay_key_id', 'YOUR_RAZORPAY_KEY_ID_HERE');
 $razorpayKeySecret = getSetting('razorpay_key_secret', 'YOUR_RAZORPAY_KEY_SECRET_HERE');
+$showRazorpayCheckout = false;
+$razorpayOrderData    = null;
+$razorpayCustomerId   = $_SESSION['razorpay_customer_id'] ?? null;
 $taxRate = (float) getSetting('tax_rate', 18.0);
 $shippingCharge = (float) getSetting('shipping_charge', 50.0);
 $freeShippingThreshold = (float) getSetting('free_shipping_threshold', 500.0);
@@ -63,9 +66,6 @@ if (!$isLoggedIn) {
     $userInfo = getUserById($userId);
 }
 
-// Phone-OTP verification flag
-$phoneVerified = isset($_SESSION['phone_verified']) && $isLoggedIn;
-
 // Load saved default delivery address for auto-fill
 $savedDefaultAddress = null;
 if ($isLoggedIn && $userId) {
@@ -89,17 +89,8 @@ $fillPhone = $userInfo['phone'] ?? '';
 $fillFirst = $fillName ? explode(' ', trim($fillName))[0] : '';
 $fillLast  = $fillName ? implode(' ', array_slice(explode(' ', trim($fillName)), 1)) : '';
 
-// Calculate combo pricing
-$itemCount = $regularCartSummary['item_count'];
-$regularTotal = $regularCartSummary['total_amount'];
-$comboResult = calculateComboPrice($itemCount, $regularTotal);
-
-// NOW we can safely define these variables
-$totalAmount = $comboResult['total'];
-$isComboApplied = $comboResult['is_combo'];
-$comboSavings = $comboResult['savings'];
-$comboType = $comboResult['combo_type'];
-$cartSummary = array_merge($regularCartSummary, $comboResult);
+$totalAmount = $regularCartSummary['total_amount'];
+$cartSummary  = $regularCartSummary;
 
 // ========================================
 // COUPON HANDLING - AFTER TOTAL AMOUNT IS DEFINED
@@ -285,7 +276,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // ========================================
 function processCODOrder($formData) {
     global $userId, $cartItems, $subtotal, $taxAmount, $shippingCost, $finalPrice, $netSubtotal;
-    global $orderProcessed, $orderId, $orderNumber, $totalAmount, $isComboApplied, $comboSavings, $comboType;
+    global $orderProcessed, $orderId, $orderNumber, $totalAmount;
     global $isLoggedIn, $finalTotalBeforePoints, $totalWalletPoints;
     global $appliedCoupon, $couponDiscount, $totalAmountAfterCoupon, $error;
 
@@ -329,27 +320,68 @@ function processCODOrder($formData) {
     ]);
 }
 
+/**
+ * Create or fetch a Razorpay Customer for Magic Checkout recognition.
+ * Returns the Razorpay customer_id string, or null on failure.
+ */
+function getRazorpayCustomerId(string $name, string $email, string $phone,
+                                string $keyId, string $keySecret): ?string {
+    if (empty($phone)) return null;
+
+    // Razorpay expects 10-digit number; strip non-digits
+    $contact = preg_replace('/\D/', '', $phone);
+    if (strlen($contact) === 10) {
+        $contact = '91' . $contact; // add country code
+    }
+
+    $payload = json_encode([
+        'name'    => $name    ?: 'Customer',
+        'email'   => $email   ?: '',
+        'contact' => $contact,
+        'fail_existing' => '0', // return existing customer if phone already registered
+    ]);
+
+    $ch = curl_init('https://api.razorpay.com/v1/customers');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => $payload,
+        CURLOPT_USERPWD        => $keyId . ':' . $keySecret,
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+        CURLOPT_TIMEOUT        => 10,
+    ]);
+    $resp = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($code === 200 || $code === 201) {
+        $data = json_decode($resp, true);
+        return $data['id'] ?? null;
+    }
+    return null;
+}
+
 function createRazorpayOrder($formData) {
     global $razorpayKeyId, $razorpayKeySecret, $finalPrice, $userId, $currencySymbol;
     global $totalWalletPoints, $totalAmountAfterCoupon, $totalAmount, $error;
-    global $showRazorpayCheckout, $razorpayOrderData;
-    
+    global $showRazorpayCheckout, $razorpayOrderData, $razorpayCustomerId;
+
     // Validate and calculate final price
     $pointsToUse = intval($formData['points_to_use'] ?? 0);
     $baseAmount = isset($totalAmountAfterCoupon) && $totalAmountAfterCoupon > 0 ? $totalAmountAfterCoupon : $totalAmount;
     $discountAmount = min($pointsToUse, $baseAmount);
     $finalPrice = max(0, $baseAmount - $discountAmount);
-    
+
     if ($pointsToUse > $totalWalletPoints) {
         $error = 'Not enough points available';
         return;
     }
-    
+
     // Store form data
     $_SESSION['checkout_data'] = $formData;
     $_SESSION['points_to_use'] = $pointsToUse;
     $_SESSION['referral_code'] = trim($formData['referral_code'] ?? '');
-    
+
     // Guard: Razorpay keys must be configured in admin settings
     if (empty($razorpayKeyId) || $razorpayKeyId === 'YOUR_RAZORPAY_KEY_ID_HERE' ||
         empty($razorpayKeySecret) || $razorpayKeySecret === 'YOUR_RAZORPAY_KEY_SECRET_HERE') {
@@ -357,13 +389,27 @@ function createRazorpayOrder($formData) {
         return;
     }
 
-    // Create Razorpay order
+    // --- Razorpay Magic Checkout: create/fetch customer for saved-payment recognition ---
+    $custName  = trim(($formData['first_name'] ?? '') . ' ' . ($formData['last_name'] ?? ''));
+    $custEmail = trim($formData['email']  ?? '');
+    $custPhone = trim($formData['phone']  ?? '');
+    $rzpCustId = getRazorpayCustomerId($custName, $custEmail, $custPhone, $razorpayKeyId, $razorpayKeySecret);
+    if ($rzpCustId) {
+        $_SESSION['razorpay_customer_id'] = $rzpCustId;
+    }
+    $razorpayCustomerId = $rzpCustId;
+    // ---------------------------------------------------------------------------------
+
+    // Create Razorpay order — attach customer_id so Magic Checkout can surface saved cards/UPI
     $orderData = [
         'amount'          => round($finalPrice * 100),
         'currency'        => 'INR',
         'receipt'         => 'order_' . time(),
-        'payment_capture' => 1
+        'payment_capture' => 1,
     ];
+    if ($rzpCustId) {
+        $orderData['customer_id'] = $rzpCustId;
+    }
 
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, 'https://api.razorpay.com/v1/orders');
@@ -394,43 +440,49 @@ function createRazorpayOrder($formData) {
 // [processVerifiedOrder function remains the same but with proper global declarations]
 function processVerifiedOrder($paymentData) {
     global $userId, $conn, $cartItems, $subtotal, $taxAmount, $shippingCost, $finalPrice, $netSubtotal;
-    global $orderProcessed, $orderId, $orderNumber, $totalAmount, $isComboApplied, $comboSavings, $comboType;
+    global $orderProcessed, $orderId, $orderNumber, $totalAmount;
     global $appliedCoupon, $couponDiscount, $isLoggedIn, $finalTotalBeforePoints, $totalWalletPoints;
     global $totalAmountAfterCoupon, $error;
-    
+
     // Get stored checkout data
     $formData = $_SESSION['checkout_data'] ?? [];
     $pointsToUse = $_SESSION['points_to_use'] ?? 0;
     $referralCodeFromForm = $_SESSION['referral_code'] ?? '';
-    
+
     // Handle COD orders
     $isCODOrder = isset($paymentData['cod_order']) && $paymentData['cod_order'] === true;
     $paymentMethod = $isCODOrder ? 'cod' : 'razorpay';
     $paymentStatus = $isCODOrder ? 'pending' : 'paid';
-    
-    // COMBO PRICING CALCULATION - UPDATED BLOCK
-    global $isLoggedIn, $totalAmount, $isComboApplied, $comboSavings, $comboType;
 
-    // Use the already calculated combo values from the main script
-    $finalCartTotal = $totalAmount; // This is already the combo price
-    $regularTotal = $totalAmount + $comboSavings; // Calculate what regular total would have been
-    
-    // Get item count for logging
+    $finalCartTotal = $totalAmount;
+
+    // Phone-first guest identity: find/create user by phone before the transaction.
+    // This ensures every order is tied to a persistent customer profile keyed on phone.
+    if (!$isLoggedIn || $userId === null) {
+        $prePhone = trim($formData['phone'] ?? '');
+        if (!empty($prePhone)) {
+            $preUser = findOrCreateUserByPhone($prePhone);
+            if ($preUser) {
+                // Merge any session-cart items into the user's DB cart
+                mergeGuestCartWithUserCart((int)$preUser['id']);
+                $userId     = (int)$preUser['id'];
+                $isLoggedIn = true;
+                loginUser($userId);
+            }
+        }
+    }
+
+    // Get cart items
+    global $cartItems, $taxRate, $shippingCost;
     $cartItems = $isLoggedIn ? getCartItems($userId) : getSessionCartItems();
-    $itemCount = count($cartItems);
-    
-    // Calculate amounts again using tax-inclusive method
-    global $finalTotalBeforePoints, $totalWalletPoints, $cartItems, $taxRate, $shippingCost;
-    
-    // Use the combo total (don't recalculate from cart items)
-    $cartTotal = $finalCartTotal; // This is the combo total (1199 or 1699)
+
+    // Calculate amounts using tax-inclusive method
+    $cartTotal  = $finalCartTotal;
     $grossTotal = $cartTotal + $shippingCost;
-    $taxAmount = ($grossTotal * $taxRate) / (100 + $taxRate);
-    $netSubtotal = $cartTotal; // Use combo total as subtotal
-    $recalculatedTotal = $cartTotal; // Final total should be combo total
-    
+    $taxAmount  = ($grossTotal * $taxRate) / (100 + $taxRate);
+    $netSubtotal = $cartTotal;
+
     // Use coupon-adjusted amount as base for points calculation
-    global $totalAmountAfterCoupon;
     $baseAmount = isset($totalAmountAfterCoupon) ? $totalAmountAfterCoupon : $totalAmount;
     $discountAmount = min($pointsToUse, $baseAmount);
     $finalPrice = max(0, $baseAmount - $discountAmount);
@@ -463,45 +515,32 @@ function processVerifiedOrder($paymentData) {
         // Start transaction
         $conn->beginTransaction();
         
-        // For guest users, save their profile FIRST
-        if (!$isLoggedIn || $userId === null) {
-            error_log("Processing guest checkout - checking for existing user");
-            
-            $guestEmail = trim($formData['email'] ?? '');
-            $guestName = trim(($formData['first_name'] ?? '') . ' ' . ($formData['last_name'] ?? ''));
-            $guestPhone = trim($formData['phone'] ?? '');
-            $guestAddress = trim($formData['address'] ?? '');
-            $guestCity = trim($formData['city'] ?? '');
-            $guestState = trim($formData['state'] ?? '');
-            $guestPincode = trim($formData['pincode'] ?? '');
-            
-            if (!empty($guestEmail) && !empty($guestName)) {
-                try {
-                    // Check if ANY user already exists with this email (guest OR registered)
-                    $stmt = $conn->prepare("SELECT id, user_type FROM users WHERE email = ?");
-                    $stmt->execute([$guestEmail]);
-                    
-                    if ($stmt->rowCount() > 0) {
-                        // User exists - use existing user ID regardless of type
-                        $existingUser = $stmt->fetch();
-                        $userId = $existingUser['id'];
-                        
-                        // Update their info but keep original user_type
-                        $updateStmt = $conn->prepare("UPDATE users SET name = ?, phone = ?, address = ?, city = ?, state = ?, pincode = ? WHERE id = ?");
-                        $updateStmt->execute([$guestName, $guestPhone, $guestAddress, $guestCity, $guestState, $guestPincode, $userId]);
-                    } else {
-                        // No user exists - create new guest user
-                        $insertStmt = $conn->prepare(
-                            "INSERT INTO users (name, email, phone, address, city, state, pincode, user_type) VALUES (?, ?, ?, ?, ?, ?, ?, 'guest')"
-                        );
-                        $insertStmt->execute([$guestName, $guestEmail, $guestPhone, $guestAddress, $guestCity, $guestState, $guestPincode]);
-                        $userId = $conn->lastInsertId();
-                    }
-                    
-                } catch (Exception $e) {
-                    error_log("ERROR: Exception in guest profile handling: " . $e->getMessage());
-                    throw $e;
-                }
+        // Update the user profile with the name/email from the checkout form
+        // (phone-first identity was already resolved above, before the transaction)
+        if ($userId) {
+            try {
+                $profileName  = trim(($formData['first_name'] ?? '') . ' ' . ($formData['last_name'] ?? ''));
+                $profileEmail = trim($formData['email'] ?? '');
+                $conn->prepare("
+                    UPDATE users
+                    SET name    = COALESCE(NULLIF(?, ''), name),
+                        email   = COALESCE(NULLIF(?, ''), email),
+                        address = COALESCE(NULLIF(?, ''), address),
+                        city    = COALESCE(NULLIF(?, ''), city),
+                        state   = COALESCE(NULLIF(?, ''), state),
+                        pincode = COALESCE(NULLIF(?, ''), pincode)
+                    WHERE id = ?
+                ")->execute([
+                    $profileName,
+                    $profileEmail,
+                    trim($formData['address'] ?? ''),
+                    trim($formData['city']    ?? ''),
+                    trim($formData['state']   ?? ''),
+                    trim($formData['pincode'] ?? ''),
+                    $userId,
+                ]);
+            } catch (Exception $e) {
+                error_log('Profile update error (non-fatal): ' . $e->getMessage());
             }
         }
         
@@ -512,8 +551,8 @@ function processVerifiedOrder($paymentData) {
             (order_number, user_id, total_amount, tax_amount, shipping_amount, wallet_points_used, final_amount,
              shipping_address, billing_address, referral_code, coupon_code, coupon_discount_percentage, coupon_discount_amount,
              payment_method, status, payment_status, razorpay_payment_id, razorpay_order_id,
-             is_combo_applied, combo_savings, combo_type, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+             created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ";
 
         $orderParams = [
@@ -535,9 +574,6 @@ function processVerifiedOrder($paymentData) {
             $paymentStatus,
             $isCODOrder ? null : $paymentData['razorpay_payment_id'],
             $isCODOrder ? null : $paymentData['razorpay_order_id'],
-            $isComboApplied ? 1 : 0,
-            $comboSavings,
-            $comboType,
         ];
 
         $orderStmt = $conn->prepare($orderSql);
@@ -1002,18 +1038,6 @@ if ($orderProcessed) {
                         <div style='background: #f8f9fa; padding: 25px; border-radius: 8px; margin-bottom: 30px;'>
                             <h2 style='color: #333; margin: 0 0 20px 0; font-size: 18px;'>💰 Order Summary</h2>
                             
-                            " . ($isComboApplied ? "
-                            <!-- Combo Pricing in Email -->
-                            <div style='display: flex; justify-content: space-between; margin-bottom: 10px;'>
-                                <span style='color: #666;'>Regular Subtotal:</span>
-                                <span style='color: #999; text-decoration: line-through;'>{$currencySymbol}" . number_format($totalAmount + $comboSavings, 2) . "</span>
-                            </div>
-                            <div style='display: flex; justify-content: space-between; margin-bottom: 10px;'>
-                                <span style='color: #28a745; font-weight: 600;'>🎉 Combo Discount (" . ($comboType == '3_for_1199' ? '3 for ₹1199' : '5 for ₹1699') . "):</span>
-                                <span style='color: #28a745; font-weight: 600;'>-{$currencySymbol}" . number_format($comboSavings, 2) . "</span>
-                            </div>
-                            " : "") . "
-                            
                             <!-- Hidden Subtotal (before tax) -->
                             <div class='d-none' style='display: none;'>
                                 <div style='display: flex; justify-content: space-between; margin-bottom: 10px;'>
@@ -1158,11 +1182,7 @@ if ($orderProcessed) {
     
 // Ensure all email variables are properly set
 $emailSubtotal = $totalAmount;
-$emailRegularTotal = $emailSubtotal + $comboSavings;
 $emailTaxExclusiveSubtotal = $emailSubtotal - $taxAmount;
-
-// Debug logging
-error_log("EMAIL VARIABLES: emailSubtotal=$emailSubtotal, emailTaxExclusiveSubtotal=$emailTaxExclusiveSubtotal, taxAmount=$taxAmount, comboSavings=$comboSavings");
     ?>
 
     <!doctype html>
@@ -1176,349 +1196,342 @@ error_log("EMAIL VARIABLES: emailSubtotal=$emailSubtotal, emailTaxExclusiveSubto
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css">
       <title>Order Confirmed - <?= htmlspecialchars($siteName) ?></title>
       
-      <!-- Confetti CSS -->
       <style>
         body {
           font-family: 'Poppins', sans-serif;
-          background: linear-gradient(135deg, #ffffffff 0%, #ffffffff 100%);
+          background: linear-gradient(135deg, #f0f4ff 0%, #fff5fb 100%);
           min-height: 100vh;
           display: flex;
           align-items: center;
-        }
-        
-        .thank-you-container {
-          background: white;
-          border-radius: 20px;
-          padding: 3rem;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.1);
-          text-align: center;
-          position: relative;
-          overflow: hidden;
-        }
-        
-        .thank-you-icon {
-          font-size: 4rem;
-          color: #28a745;
-          margin-bottom: 1rem;
-          animation: bounce 2s infinite;
-        }
-        
-        .thank-you-title {
-          font-size: 2.5rem;
-          font-weight: 600;
-          color: #333;
-          margin-bottom: 1rem;
-        }
-        
-        .thank-you-subtitle {
-          font-size: 1.2rem;
-          color: #666;
-          margin-bottom: 2rem;
-        }
-        
-        .order-details {
-          background: #B2E4AE;
-          border-radius: 15px;
-          padding: 2rem;
-          margin: 2rem 0;
-        }
-        
-        .order-number {
-          font-size: 1.5rem;
-          font-weight: 600;
-          color: #667eea;
-          margin-bottom: 1rem;
-        }
-        
-        .order-amount {
-          font-size: 2rem;
-          font-weight: 700;
-          color: #28a745;
-          margin-bottom: 1rem;
-        }
-        
-        .action-buttons {
-          display: flex;
-          gap: 1rem;
           justify-content: center;
-          flex-wrap: wrap;
-          margin-top: 2rem;
+          padding: 20px 0;
         }
-        
-        .btn-action {
-          padding: 12px 30px;
-          border-radius: 50px;
+
+        .ty-card {
+          background: white;
+          border-radius: 28px;
+          padding: 3rem 2.5rem;
+          text-align: center;
+          box-shadow: 0 24px 64px rgba(0,0,0,0.12);
+          position: relative;
+          overflow: visible;
+          max-width: 520px;
+          width: 100%;
+          margin: 0 auto;
+        }
+
+        /* ── Animated SVG checkmark ── */
+        .success-icon-wrap {
+          width: 110px;
+          height: 110px;
+          margin: 0 auto 1.6rem;
+          position: relative;
+        }
+
+        .check-svg {
+          width: 110px;
+          height: 110px;
+          filter: drop-shadow(0 6px 18px rgba(40,167,69,0.35));
+        }
+
+        .check-circle-bg {
+          fill: #e8f5e9;
+          stroke: none;
+        }
+
+        .check-ring {
+          fill: none;
+          stroke: #28a745;
+          stroke-width: 5;
+          stroke-linecap: round;
+          stroke-dasharray: 314;
+          stroke-dashoffset: 314;
+          transform-origin: 55px 55px;
+          transform: rotate(-90deg);
+          animation: draw-ring 0.65s cubic-bezier(0.4,0,0.2,1) 0.15s forwards;
+        }
+
+        .check-tick {
+          fill: none;
+          stroke: #28a745;
+          stroke-width: 5.5;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+          stroke-dasharray: 55;
+          stroke-dashoffset: 55;
+          animation: draw-tick 0.35s ease 0.75s forwards;
+        }
+
+        @keyframes draw-ring {
+          to { stroke-dashoffset: 0; }
+        }
+        @keyframes draw-tick {
+          to { stroke-dashoffset: 0; }
+        }
+
+        /* ── Pop-scale on arrival ── */
+        .ty-card {
+          animation: card-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards;
+          transform: scale(0.9);
+          opacity: 0;
+        }
+        @keyframes card-pop {
+          to { transform: scale(1); opacity: 1; }
+        }
+
+        /* ── Typography ── */
+        .ty-title {
+          font-size: 2.2rem;
+          font-weight: 700;
+          color: #1a1a2e;
+          margin-bottom: 0.4rem;
+          letter-spacing: -0.5px;
+        }
+
+        .ty-sub {
+          font-size: 1rem;
+          color: #6c757d;
+          margin-bottom: 1.6rem;
+        }
+
+        /* ── Order summary card ── */
+        .order-card {
+          background: linear-gradient(135deg, #e8f5e9 0%, #f0fff4 100%);
+          border: 1.5px solid #c8e6c9;
+          border-radius: 18px;
+          padding: 1.5rem 1.2rem;
+          margin: 0 0 1.6rem;
+        }
+
+        .order-num {
+          font-size: 1rem;
           font-weight: 600;
-          text-decoration: none;
-          transition: all 0.3s ease;
+          color: #004AAD;
+          margin-bottom: 0.4rem;
+          letter-spacing: 0.3px;
+        }
+
+        .order-amt {
+          font-size: 2.2rem;
+          font-weight: 700;
+          color: #1e7e34;
+          line-height: 1.1;
+        }
+
+        .order-meta {
+          font-size: 0.82rem;
+          color: #888;
+          margin-top: 0.6rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.4rem;
+        }
+
+        .order-meta i { color: #28a745; }
+
+        /* ── Action buttons ── */
+        .ty-actions {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 0.7rem;
+          margin-bottom: 1.6rem;
+        }
+
+        .ty-btn {
           display: inline-flex;
           align-items: center;
-          gap: 0.5rem;
-        }
-        
-        .btn-primary-action {
-          background: linear-gradient(45deg, #667eea, #764ba2);
-          color: white;
+          justify-content: center;
+          gap: 0.45rem;
+          padding: 0.75rem 1rem;
+          border-radius: 50px;
+          font-size: 0.88rem;
+          font-weight: 600;
+          text-decoration: none;
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
           border: none;
+          cursor: pointer;
+          white-space: nowrap;
         }
-        
-        .btn-primary-action:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+
+        .ty-btn:hover { transform: translateY(-3px); text-decoration: none; }
+
+        .ty-btn-home {
+          grid-column: 1 / -1;
+          background: linear-gradient(135deg, #004AAD, #0066cc);
           color: white;
-          text-decoration: none;
         }
-        
-        .btn-secondary-action {
-          background: white;
-          color: #667eea;
-          border: 2px solid #667eea;
+        .ty-btn-home:hover  { box-shadow: 0 10px 24px rgba(0,74,173,0.35); color: white; }
+
+        .ty-btn-shop {
+          background: #f5f5f5;
+          color: #333;
+          border: 1.5px solid #e0e0e0;
         }
-        
-        .btn-secondary-action:hover {
-          background: #667eea;
+        .ty-btn-shop:hover  { background: #ebebeb; color: #333; }
+
+        .ty-btn-track {
+          background: #f5f5f5;
+          color: #333;
+          border: 1.5px solid #e0e0e0;
+        }
+        .ty-btn-track:hover { background: #ebebeb; color: #333; }
+
+        .ty-btn-invoice {
+          grid-column: 1 / -1;
+          background: linear-gradient(135deg, #28a745, #20c997);
           color: white;
-          text-decoration: none;
-          transform: translateY(-3px);
         }
-        
-        /* Confetti Animation */
-        .confetti {
-          position: absolute;
-          width: 10px;
-          height: 10px;
-          background: #f0f;
-          animation: confetti-fall 3s linear infinite;
+        .ty-btn-invoice:hover { box-shadow: 0 10px 24px rgba(40,167,69,0.35); color: white; }
+
+        /* ── What's next ── */
+        .whats-next {
+          border-top: 1px solid #f0f0f0;
+          padding-top: 1.4rem;
         }
-        
-        .confetti:nth-child(1) { left: 10%; animation-delay: 0s; background: #ff6b6b; }
-        .confetti:nth-child(2) { left: 20%; animation-delay: 0.2s; background: #4ecdc4; }
-        .confetti:nth-child(3) { left: 30%; animation-delay: 0.4s; background: #45b7d1; }
-        .confetti:nth-child(4) { left: 40%; animation-delay: 0.6s; background: #f9ca24; }
-        .confetti:nth-child(5) { left: 50%; animation-delay: 0.8s; background: #f0932b; }
-        .confetti:nth-child(6) { left: 60%; animation-delay: 1s; background: #eb4d4b; }
-        .confetti:nth-child(7) { left: 70%; animation-delay: 1.2s; background: #6c5ce7; }
-        .confetti:nth-child(8) { left: 80%; animation-delay: 1.4s; background: #a29bfe; }
-        .confetti:nth-child(9) { left: 90%; animation-delay: 1.6s; background: #fd79a8; }
-        .confetti:nth-child(10) { left: 15%; animation-delay: 1.8s; background: #00b894; }
-        
-        @keyframes confetti-fall {
-          0% {
-            transform: translateY(-100vh) rotate(0deg);
-            opacity: 1;
-          }
-          100% {
-            transform: translateY(100vh) rotate(720deg);
-            opacity: 0;
-          }
+
+        .whats-next-title {
+          font-size: 0.85rem;
+          font-weight: 700;
+          color: #333;
+          text-transform: uppercase;
+          letter-spacing: 0.8px;
+          margin-bottom: 0.8rem;
         }
-        
-        @keyframes bounce {
-          0%, 20%, 50%, 80%, 100% {
-            transform: translateY(0);
-          }
-          40% {
-            transform: translateY(-20px);
-          }
-          60% {
-            transform: translateY(-10px);
-          }
+
+        .next-list {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          display: inline-block;
+          text-align: left;
         }
-        
-        .pulse-ring {
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          width: 100px;
-          height: 100px;
-          border: 3px solid #28a745;
-          border-radius: 50%;
-          animation: pulse-ring 2s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+
+        .next-list li {
+          font-size: 0.83rem;
+          color: #666;
+          padding: 0.28rem 0;
+          display: flex;
+          align-items: center;
+          gap: 0.55rem;
         }
-        
-        @keyframes pulse-ring {
-          0% {
-            transform: translate(-50%, -50%) scale(0.8);
-            opacity: 1;
-          }
-          100% {
-            transform: translate(-50%, -50%) scale(2);
-            opacity: 0;
-          }
-        }
-        
-        @media (max-width: 768px) {
-          .thank-you-container {
-            padding: 2rem 1rem;
-          }
-          
-          .thank-you-title {
-            font-size: 2rem;
-          }
-          
-          .action-buttons {
-            flex-direction: column;
-            align-items: center;
-          }
-          
-          .btn-action {
-            width: 100%;
-            max-width: 300px;
-          }
+
+        .next-list li i { color: #28a745; width: 14px; flex-shrink: 0; }
+
+        @media (max-width: 500px) {
+          .ty-card    { padding: 2rem 1.1rem; border-radius: 20px; }
+          .ty-title   { font-size: 1.7rem; }
+          .ty-actions { grid-template-columns: 1fr; }
+          .ty-btn-home, .ty-btn-invoice { grid-column: 1; }
+          .order-amt  { font-size: 1.8rem; }
         }
       </style>
     </head>
     <body>
+      <!-- confetti renders on its own canvas — no extra DOM needed -->
+
       <div class="container">
         <div class="row justify-content-center">
-          <div class="col-lg-8">
-            <div class="thank-you-container">
-              <!-- Confetti Animation -->
-              <div class="confetti"></div>
-              <div class="confetti"></div>
-              <div class="confetti"></div>
-              <div class="confetti"></div>
-              <div class="confetti"></div>
-              <div class="confetti"></div>
-              <div class="confetti"></div>
-              <div class="confetti"></div>
-              <div class="confetti"></div>
-              <div class="confetti"></div>
- 
-              
-              <!-- Thank You Message -->
-              <h1 class="thank-you-title">Thank You!</h1>
-              <p class="thank-you-subtitle">Your order has been successfully placed and confirmed.</p>
-              
-              <!-- Order Details -->
-                <!-- Replace the existing order details section with this: -->
-                <div class="order-details">
-                    <div class="order-number">
-                        Order #<?= htmlspecialchars($orderNumber) ?>
-                    </div>
-                    
-                    <?php if ($isComboApplied): ?>
-                        <!-- Show combo pricing with strikethrough regular price -->
-                        <div class="combo-applied mb-3">
-                            <div style="text-decoration: line-through; color: #999; font-size: 1.2rem;">
-                                ₹<?= number_format($totalAmount + $comboSavings, 2) ?>
-                            </div>
-                            <div class="order-amount">
-                                ₹<?= number_format($finalPrice, 2) ?>
-                            </div>
-                            <div style="color: #28a745; font-size: 1rem; margin-top: 0.5rem;">
-                                🎉 Combo Offer Applied!
-                                <?php if ($comboType == '3_for_1199'): ?>
-                                    <br><small>3 Products for ₹1199 - Saved ₹<?= number_format($comboSavings, 2) ?>!</small>
-                                <?php else: ?>
-                                    <br><small>5 Products for ₹1699 - Saved ₹<?= number_format($comboSavings, 2) ?>!</small>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    <?php else: ?>
-                        <!-- Regular pricing -->
-                        <div class="order-amount">
-                            ₹<?= number_format($finalPrice, 2) ?>
-                        </div>
-                    <?php endif; ?>
-                    
-                    <?php if ($pointsToUse > 0): ?>
-                        <p class="text-muted">
-                            <i class="fas fa-wallet mr-2"></i>
-                            Wallet Points Used: ₹<?= number_format($pointsToUse, 2) ?>
-                        </p>
-                    <?php endif; ?>
-                    <p class="text-muted mb-0">
-                        <i class="fas fa-clock mr-2"></i>
-                        We'll send you a confirmation email shortly with tracking details.
-                    </p>
-                </div>
-              <div class="action-buttons">
-                <a href="index.php" class="btn-action btn-primary-action">
-                  <i class="fas fa-home"></i>
-                  Back to Home
-                </a>
-                
-                <a href="shop/category.php" class="btn-action btn-secondary-action">
-                  <i class="fas fa-shopping-bag"></i>
-                  Continue Shopping
-                </a>
-                
-                <a href="account/orders.php" class="btn-action btn-secondary-action">
-                  <i class="fas fa-truck"></i>
-                  Track My Order
-                </a>
-                
-                <!-- NEW: Invoice download button -->
-                <a href="invoice.php?order_id=<?= $orderId ?>" target="_blank" class="btn-action btn-secondary-action" style="background: #28a745; color: white; border-color: #28a745;">
-                  <i class="fas fa-file-invoice"></i>
-                  Download Invoice
-                </a>
-              </div>
-              
-              <!-- Additional Info -->
-              <div class="mt-4 pt-4 border-top">
-                <p class="text-muted mb-2">
-                  <strong>What's Next?</strong>
-                </p>
-                <div class="d-flex flex-row justify-content-center">
-                     <ul class="list-unstyled text-muted text-left">
-                      <li><i class="fas fa-envelope mr-2"></i> Order confirmation email sent</li>
-                      <li><i class="fas fa-box mr-2"></i> We'll prepare your order within 24 hours</li>
-                      <li><i class="fas fa-shipping-fast mr-2"></i> Free shipping on orders above <?= htmlspecialchars($currencySymbol) ?><?= number_format($freeShippingThreshold, 0) ?></li>
-                      <li><i class="fas fa-headset mr-2"></i> Need help? Contact info@bluefifth.in</li>
-                    </ul>                   
-                </div>
+          <div class="col-12 px-3">
+            <div class="ty-card">
 
+              <!-- Animated SVG checkmark -->
+              <div class="success-icon-wrap">
+                <svg class="check-svg" viewBox="0 0 110 110" xmlns="http://www.w3.org/2000/svg">
+                  <circle class="check-circle-bg" cx="55" cy="55" r="50"/>
+                  <circle class="check-ring" cx="55" cy="55" r="50"/>
+                  <polyline class="check-tick" points="32,57 47,72 78,38"/>
+                </svg>
               </div>
-            </div>
+
+              <h1 class="ty-title">Thank You!</h1>
+              <p class="ty-sub">Your order has been successfully placed and confirmed.</p>
+
+              <!-- Order card -->
+              <div class="order-card">
+                <div class="order-num">Order #<?= htmlspecialchars($orderNumber) ?></div>
+                <div class="order-amt">₹<?= number_format($finalPrice, 2) ?></div>
+                <?php if ($pointsToUse > 0): ?>
+                <div class="order-meta">
+                  <i class="fas fa-wallet"></i>
+                  Wallet points used: ₹<?= number_format($pointsToUse, 2) ?>
+                </div>
+                <?php endif; ?>
+                <div class="order-meta">
+                  <i class="fas fa-clock"></i>
+                  Confirmation email sent with tracking details
+                </div>
+              </div>
+
+              <!-- Action buttons -->
+              <div class="ty-actions">
+                <a href="index.php" class="ty-btn ty-btn-home">
+                  <i class="fas fa-home"></i> Back to Home
+                </a>
+                <a href="shop/category.php" class="ty-btn ty-btn-shop">
+                  <i class="fas fa-shopping-bag"></i> Shop More
+                </a>
+                <a href="account/orders.php" class="ty-btn ty-btn-track">
+                  <i class="fas fa-truck"></i> Track Order
+                </a>
+                <a href="invoice.php?order_id=<?= $orderId ?>" target="_blank" class="ty-btn ty-btn-invoice">
+                  <i class="fas fa-file-invoice"></i> Download Invoice
+                </a>
+              </div>
+
+              <!-- What's next -->
+              <div class="whats-next">
+                <p class="whats-next-title">What happens next?</p>
+                <ul class="next-list">
+                  <li><i class="fas fa-envelope"></i> Order confirmation email sent</li>
+                  <li><i class="fas fa-box"></i> We'll prepare your order within 24 hours</li>
+                  <li><i class="fas fa-shipping-fast"></i> Free shipping on orders above <?= htmlspecialchars($currencySymbol) ?><?= number_format($freeShippingThreshold, 0) ?></li>
+                  <li><i class="fas fa-headset"></i> Need help? Contact info@bluefifth.in</li>
+                </ul>
+              </div>
+
+            </div><!-- /.ty-card -->
           </div>
         </div>
       </div>
-      
-      <!-- JavaScript for enhanced animations -->
+
+      <!-- canvas-confetti CDN -->
+      <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
       <script>
-        // Add extra confetti particles dynamically
-        document.addEventListener('DOMContentLoaded', function() {
-          const container = document.querySelector('.thank-you-container');
-          
-          // Create more confetti
-          for (let i = 0; i < 20; i++) {
-            const confetti = document.createElement('div');
-            confetti.className = 'confetti';
-            confetti.style.left = Math.random() * 100 + '%';
-            confetti.style.animationDelay = Math.random() * 3 + 's';
-            confetti.style.backgroundColor = getRandomColor();
-            container.appendChild(confetti);
+        document.addEventListener('DOMContentLoaded', function () {
+          var COLORS = ['#004AAD','#28a745','#FFD700','#ff6b6b','#4ecdc4','#a29bfe','#fd79a8','#f9ca24'];
+
+          function fire(opts) {
+            confetti(Object.assign({ zIndex: 9999, colors: COLORS }, opts));
           }
-          
-          // Play success sound (if available)
-          try {
-            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmAZBjlhx/HTgjcCJHbE8N4=');
-            audio.play().catch(() => {}); // Ignore errors
-          } catch(e) {}
-          
-          // Add celebration effect
-          setTimeout(() => {
-            document.querySelector('.thank-you-icon').style.transform = 'scale(1.2)';  
-            setTimeout(() => {
-              document.querySelector('.thank-you-icon').style.transform = 'scale(1)';
-            }, 200);
-          }, 500);
+
+          // Initial big burst — fires from both lower corners (Flipkart/Amazon style)
+          setTimeout(function () {
+            fire({ particleCount: 60, angle: 60,  spread: 55, origin: { x: 0,   y: 0.75 } });
+            fire({ particleCount: 60, angle: 120, spread: 55, origin: { x: 1,   y: 0.75 } });
+            fire({ particleCount: 80, spread: 80, origin: { x: 0.5, y: 0.65 }, startVelocity: 40 });
+          }, 550);
+
+          // Gold coin burst
+          setTimeout(function () {
+            confetti({
+              particleCount: 70,
+              spread: 90,
+              origin: { x: 0.5, y: 0.55 },
+              colors: ['#FFD700','#FFA500','#FF8C00','#FFEC8B'],
+              shapes: ['circle'],
+              scalar: 1.4,
+              gravity: 0.7,
+              zIndex: 9999
+            });
+          }, 900);
+
+          // Second side-burst for extra drama
+          setTimeout(function () {
+            fire({ particleCount: 40, angle: 60,  spread: 45, origin: { x: 0,   y: 0.7 } });
+            fire({ particleCount: 40, angle: 120, spread: 45, origin: { x: 1,   y: 0.7 } });
+          }, 1500);
         });
-        
-        function getRandomColor() {
-          const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#f0932b', '#eb4d4b', '#6c5ce7', '#a29bfe', '#fd79a8', '#00b894'];
-          return colors[Math.floor(Math.random() * colors.length)];
-        }
-        
-        // Auto-redirect after 30 seconds (optional)
-        setTimeout(() => {
-          if (confirm('Would you like to continue shopping?')) {
-            window.location.href = 'shop/category.php';
-          }
-        }, 30000);
       </script>
     </body>
     </html>
@@ -1894,41 +1907,24 @@ html, body {
   overflow-x: hidden;
 }
 
-/* ===== OTP Gate ===== */
-.otp-gate-wrap { padding: 28px 16px; text-align: center; }
-.otp-gate-icon { font-size: 44px; margin-bottom: 8px; }
-.otp-gate-title { font-size: 20px; font-weight: 700; color: #333; margin-bottom: 6px; }
-.otp-gate-sub { color: #666; font-size: 14px; margin-bottom: 22px; }
-.otp-phone-row { display: flex; align-items: center; gap: 8px; max-width: 420px; margin: 0 auto 10px; }
-.otp-flag { font-size: 14px; white-space: nowrap; color: #444; padding: 10px 12px; background: #f0f0f0; border-radius: 6px; border: 1px solid #ddd; }
-.otp-phone-field { flex: 1; min-width: 0; padding: 10px 14px; font-size: 16px; border: 1.5px solid #ccc; border-radius: 6px; outline: none; transition: border-color .2s; }
-.otp-phone-field:focus { border-color: #6C803F; }
-.otp-primary-btn { padding: 10px 20px; background: #6C803F; color: #fff; border: none; border-radius: 6px; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background .2s; }
-.otp-primary-btn:hover { background: #5a6e33; }
-.otp-primary-btn:disabled { background: #aaa; cursor: not-allowed; }
-.otp-error-msg { color: #dc3545; font-size: 13px; margin-top: 4px; text-align: center; }
-.otp-phone-highlight { font-weight: 600; color: #333; }
-.otp-change-link { color: #6C803F; text-decoration: underline; font-size: 13px; margin-left: 8px; }
-.otp-boxes-row { display: flex; justify-content: center; gap: 10px; margin: 0 auto 14px; }
-.otp-box { width: 46px; height: 54px; text-align: center; font-size: 22px; font-weight: 600; border: 2px solid #ccc; border-radius: 8px; outline: none; transition: border-color .2s; caret-color: transparent; }
-.otp-box:focus { border-color: #6C803F; background: #f9fbf4; }
-.otp-box.filled { border-color: #6C803F; }
-.otp-actions-row { margin-bottom: 14px; }
-.otp-resend-row { font-size: 13px; color: #888; }
-.otp-resend-row a { color: #6C803F; text-decoration: underline; }
-.otp-steps { display: flex; justify-content: center; align-items: center; gap: 6px; margin-bottom: 24px; font-size: 12px; flex-wrap: wrap; }
-.otp-step-dot { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; background: #e0e0e0; color: #888; flex-shrink: 0; }
-.otp-step-dot.active { background: #6C803F; color: #fff; }
-.otp-step-dot.done { background: #879D60; color: #fff; }
-.otp-step-label { color: #999; font-size: 11px; }
-.otp-step-label.active { color: #6C803F; font-weight: 600; }
-.otp-step-line { width: 28px; height: 2px; background: #ddd; border-radius: 2px; flex-shrink: 0; }
-.otp-step-line.done { background: #879D60; }
+/* ===== Phone Gate (Razorpay Magic Checkout pre-fill) ===== */
+.phone-gate-wrap { padding: 32px 16px 24px; text-align: center; max-width: 480px; margin: 0 auto; }
+.phone-gate-icon { font-size: 48px; margin-bottom: 10px; }
+.phone-gate-title { font-size: 22px; font-weight: 700; color: #1a1a2e; margin-bottom: 6px; }
+.phone-gate-sub { color: #666; font-size: 14px; margin-bottom: 26px; line-height: 1.5; }
+.phone-row { display: flex; align-items: center; gap: 8px; max-width: 420px; margin: 0 auto 10px; }
+.phone-flag { font-size: 14px; white-space: nowrap; color: #444; padding: 11px 12px; background: #f0f0f0; border-radius: 8px; border: 1.5px solid #ddd; }
+.phone-field { flex: 1; min-width: 0; padding: 11px 14px; font-size: 16px; border: 1.5px solid #ccc; border-radius: 8px; outline: none; transition: border-color .2s; }
+.phone-field:focus { border-color: #6C803F; box-shadow: 0 0 0 3px rgba(108,128,63,.12); }
+.phone-primary-btn { padding: 11px 22px; background: #6C803F; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background .2s, transform .15s; }
+.phone-primary-btn:hover { background: #5a6e33; transform: translateY(-1px); }
+.phone-primary-btn:disabled { background: #aaa; cursor: not-allowed; transform: none; }
+.phone-error-msg { color: #dc3545; font-size: 13px; margin-top: 6px; text-align: center; }
+.phone-welcome-msg { background: linear-gradient(135deg,#d4edda,#c3e6cb); border-radius: 10px; padding: 12px 16px; margin-top: 16px; color: #155724; font-size: 14px; text-align: left; border: 1px solid #b1dfbb; }
+.phone-loading-msg { color: #666; font-size: 14px; padding: 12px; text-align: center; }
 @media (max-width: 480px) {
-  .otp-phone-row { flex-wrap: wrap; }
-  .otp-phone-row .otp-primary-btn { width: 100%; }
-  .otp-box { width: 38px; height: 46px; font-size: 18px; gap: 6px; }
-  .otp-boxes-row { gap: 6px; }
+  .phone-row { flex-wrap: wrap; }
+  .phone-primary-btn { width: 100%; margin-top: 6px; }
 }
 
   </style>
@@ -1952,69 +1948,34 @@ html, body {
     <div class="row">
       <div class="col-lg-7 p-4" style="background-color:#f8f8f8; border-radius: 8px; ">
 
-        <!-- OTP Gate — verify phone before showing checkout form -->
-        <div id="otp-gate" <?= $phoneVerified ? 'style="display:none"' : '' ?>>
-
-          <!-- Step progress -->
-          <div class="otp-steps">
-            <div class="otp-step-dot active" id="step-dot-1">1</div>
-            <span class="otp-step-label active" id="step-label-1">Mobile</span>
-            <div class="otp-step-line" id="step-line-1"></div>
-            <div class="otp-step-dot" id="step-dot-2">2</div>
-            <span class="otp-step-label" id="step-label-2">Verify OTP</span>
-            <div class="otp-step-line" id="step-line-2"></div>
-            <div class="otp-step-dot" id="step-dot-3">3</div>
-            <span class="otp-step-label" id="step-label-3">Checkout</span>
-          </div>
-
-          <!-- Step 1: Phone number entry -->
-          <div id="otp-step-1">
-            <div class="otp-gate-wrap">
-              <div class="otp-gate-icon">📱</div>
-              <h2 class="otp-gate-title">Enter your mobile number</h2>
-              <p class="otp-gate-sub">We'll send a 6-digit OTP to verify your number</p>
-              <div class="otp-phone-row">
-                <span class="otp-flag">🇮🇳 +91</span>
-                <input type="tel" id="otp-phone-input" class="otp-phone-field"
-                       placeholder="10-digit mobile number" maxlength="10" inputmode="numeric">
-                <button type="button" id="otp-send-btn" class="otp-primary-btn" onclick="handleSendOTP()">Send OTP</button>
-              </div>
-              <div id="otp-phone-error" class="otp-error-msg" style="display:none"></div>
+        <!-- Phone Gate — collect phone for returning-customer lookup -->
+        <div id="phone-gate" <?= $isLoggedIn ? 'style="display:none"' : '' ?>>
+          <div class="phone-gate-wrap">
+            <div class="phone-gate-icon">📱</div>
+            <h2 class="phone-gate-title">Enter your mobile number</h2>
+            <p class="phone-gate-sub">
+              Returning customers get instant auto-fill.<br>
+              No password needed — Razorpay verifies you during payment.
+            </p>
+            <div class="phone-row">
+              <span class="phone-flag">🇮🇳 +91</span>
+              <input type="tel" id="phone-input" class="phone-field"
+                     placeholder="10-digit mobile number"
+                     maxlength="10" inputmode="numeric" autocomplete="tel">
+              <button type="button" id="phone-continue-btn"
+                      class="phone-primary-btn"
+                      onclick="handlePhoneContinue()">Continue →</button>
             </div>
-          </div>
-
-          <!-- Step 2: OTP verification -->
-          <div id="otp-step-2" style="display:none">
-            <div class="otp-gate-wrap">
-              <div class="otp-gate-icon">🔒</div>
-              <h2 class="otp-gate-title">Enter the OTP</h2>
-              <p class="otp-gate-sub">
-                Sent to <span id="otp-phone-display" class="otp-phone-highlight"></span>
-                <a href="#" onclick="showPhoneStep(); return false;" class="otp-change-link">Change</a>
-              </p>
-              <div class="otp-boxes-row" id="otp-boxes">
-                <input type="text" class="otp-box" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
-                <input type="text" class="otp-box" maxlength="1" inputmode="numeric">
-                <input type="text" class="otp-box" maxlength="1" inputmode="numeric">
-                <input type="text" class="otp-box" maxlength="1" inputmode="numeric">
-                <input type="text" class="otp-box" maxlength="1" inputmode="numeric">
-                <input type="text" class="otp-box" maxlength="1" inputmode="numeric">
-              </div>
-              <div id="otp-verify-error" class="otp-error-msg" style="display:none"></div>
-              <div class="otp-actions-row">
-                <button type="button" id="otp-verify-btn" class="otp-primary-btn" onclick="handleVerifyOTP()">Verify &amp; Continue</button>
-              </div>
-              <div class="otp-resend-row">
-                <span id="otp-resend-timer">Resend OTP in <b id="otp-countdown">30</b>s</span>
-                <a href="#" id="otp-resend-link" onclick="handleResendOTP(); return false;" style="display:none">Resend OTP</a>
-              </div>
+            <div id="phone-error" class="phone-error-msg" style="display:none"></div>
+            <div id="phone-loading" style="display:none" class="phone-loading-msg">
+              ⏳ Checking your details…
             </div>
+            <div id="phone-welcome" style="display:none"></div>
           </div>
+        </div><!-- /#phone-gate -->
 
-        </div><!-- /#otp-gate -->
-
-        <!-- Checkout Gate — shown only after OTP verified -->
-        <div id="checkout-gate" <?= !$phoneVerified ? 'style="display:none"' : '' ?>>
+        <!-- Checkout Gate — shown after phone entry (or immediately if already logged in) -->
+        <div id="checkout-gate" <?= !$isLoggedIn ? 'style="display:none"' : '' ?>>
 
         <!-- Logged In User Checkout Form -->
         <form method="POST" id="checkout-form" >
@@ -2329,24 +2290,6 @@ html, body {
             <span><?= htmlspecialchars($currencySymbol) ?><?= number_format($subtotal, 2) ?></span>
           </div>
           
-          <!-- Combo Discount Display (if applicable) -->
-          <?php if ($isComboApplied): ?>
-          <div class="order-summary-line mt-4" style="color: #28a745; border-top: 1px solid #eee; padding-top: 15px;">
-            <span><strong>🎉 Combo Applied</strong></span>
-            <span><strong>-<?= htmlspecialchars($currencySymbol) ?><?= number_format($comboSavings, 2) ?></strong></span>
-          </div>
-          <div class="order-summary-line" style="color: #28a745; font-size: 12px;">
-            <span style="font-style: italic;">
-              <?php if ($comboType == '3_for_1199'): ?>
-                3 Products for ₹1199
-              <?php else: ?>
-                5 Products for ₹1699
-              <?php endif; ?>
-            </span>
-            <span></span>
-          </div>
-          <?php endif; ?>
-          
           <!-- Coupon Discount Line (dynamically shown/hidden) -->
           <div class="order-summary-line" id="coupon-discount-line" style="display: <?= $appliedCoupon ? 'flex' : 'none' ?>; color: #dc3545;">
             <span>💰 Coupon Discount (<span id="sidebar-coupon-code"><?= htmlspecialchars($appliedCoupon['code'] ?? '') ?></span>)</span>
@@ -2412,7 +2355,7 @@ html, body {
     // Update price calculation with coupon support
     let currentCoupon = <?= json_encode($appliedCoupon) ?>;
     let couponDiscount = <?= $couponDiscount ?>;
-    let baseTotal = <?= $totalAmount ?>; // Original combo total
+    let baseTotal = <?= $totalAmount ?>;
     let currentShippingCost = <?= $shippingCost ?>;
     let taxRate = <?= $taxRate ?>;
     let freeShippingThreshold = <?= $freeShippingThreshold ?>;
@@ -2492,7 +2435,6 @@ html, body {
         
         const pointsToUse = parseInt(slider.value);
         
-        // Calculate base amount (combo total minus coupon discount)
         let baseAmount = <?= $totalAmount ?>;
         if (currentCoupon && couponDiscount > 0) {
             baseAmount = baseAmount - couponDiscount;
@@ -2766,7 +2708,7 @@ html, body {
         }, 3000);
     });
 
-    // Razorpay Integration
+    // Razorpay Integration (with Magic Checkout / saved customer recognition)
     <?php if (isset($showRazorpayCheckout) && $showRazorpayCheckout): ?>
     document.addEventListener('DOMContentLoaded', function() {
         const options = {
@@ -2776,43 +2718,37 @@ html, body {
             name: '<?= htmlspecialchars($siteName) ?>',
             description: 'Order Payment',
             order_id: '<?= $razorpayOrderData['id'] ?>',
+            <?php if (!empty($razorpayCustomerId)): ?>
+            // Magic Checkout: pass Razorpay customer_id so the checkout surfaces
+            // saved cards/UPI/addresses from the customer's Razorpay wallet.
+            customer_id: '<?= htmlspecialchars($razorpayCustomerId) ?>',
+            remember_customer: true,
+            <?php endif; ?>
             handler: function(response) {
-                // Add payment details to form and submit
                 const form = document.getElementById('checkout-form');
-                
-                const paymentIdInput = document.createElement('input');
-                paymentIdInput.type = 'hidden';
-                paymentIdInput.name = 'razorpay_payment_id';
-                paymentIdInput.value = response.razorpay_payment_id;
-                form.appendChild(paymentIdInput);
-                
-                const orderIdInput = document.createElement('input');
-                orderIdInput.type = 'hidden';
-                orderIdInput.name = 'razorpay_order_id';
-                orderIdInput.value = response.razorpay_order_id;
-                form.appendChild(orderIdInput);
-                
-                const signatureInput = document.createElement('input');
-                signatureInput.type = 'hidden';
-                signatureInput.name = 'razorpay_signature';
-                signatureInput.value = response.razorpay_signature;
-                form.appendChild(signatureInput);
-                
+
+                const addHidden = (name, value) => {
+                    const el = document.createElement('input');
+                    el.type = 'hidden'; el.name = name; el.value = value;
+                    form.appendChild(el);
+                };
+                addHidden('razorpay_payment_id', response.razorpay_payment_id);
+                addHidden('razorpay_order_id',   response.razorpay_order_id);
+                addHidden('razorpay_signature',  response.razorpay_signature);
                 form.submit();
             },
             prefill: {
-                name: '<?= htmlspecialchars($_SESSION['checkout_data']['first_name'] ?? '') ?> <?= htmlspecialchars($_SESSION['checkout_data']['last_name'] ?? '') ?>',
-                email: '<?= htmlspecialchars($_SESSION['checkout_data']['email'] ?? '') ?>',
-                contact: '<?= htmlspecialchars($_SESSION['checkout_data']['phone'] ?? '') ?>'
+                name:    '<?= htmlspecialchars(trim(($_SESSION['checkout_data']['first_name'] ?? '') . ' ' . ($_SESSION['checkout_data']['last_name'] ?? ''))) ?>',
+                email:   '<?= htmlspecialchars($_SESSION['checkout_data']['email']   ?? '') ?>',
+                contact: '<?= htmlspecialchars($_SESSION['checkout_data']['phone']   ?? $fillPhone ?? '') ?>'
             },
-            theme: {
-                color: '#667eea'
-            }
+            theme: { color: '#004AAD' },
+            modal: { confirm_close: true }
         };
-        
+
         const rzp = new Razorpay(options);
         rzp.open();
-        
+
         rzp.on('payment.failed', function(response) {
             alert('Payment failed: ' + response.error.description);
             window.location.reload();
@@ -2946,169 +2882,75 @@ html, body {
         return false;
     }
 
-    /* ===== OTP Gate JS ===== */
+    /* ===== Phone Gate JS — Razorpay Magic Checkout pre-fill ===== */
     (function () {
-        var otpPhone = '';
-        var resendTimer = null;
-
-        window.handleSendOTP = function () {
-            var phoneInput = document.getElementById('otp-phone-input');
-            var phone = phoneInput.value.trim().replace(/\D/g, '');
-            var errEl = document.getElementById('otp-phone-error');
-            var btn   = document.getElementById('otp-send-btn');
+        window.handlePhoneContinue = function () {
+            var phoneInput = document.getElementById('phone-input');
+            var phone      = phoneInput.value.trim().replace(/\D/g, '');
+            var errEl      = document.getElementById('phone-error');
+            var btn        = document.getElementById('phone-continue-btn');
+            var loadingEl  = document.getElementById('phone-loading');
             errEl.style.display = 'none';
+
             if (!/^[6-9]\d{9}$/.test(phone)) {
                 errEl.textContent = 'Please enter a valid 10-digit Indian mobile number.';
                 errEl.style.display = 'block';
                 return;
             }
-            otpPhone = phone;
+
             btn.disabled = true;
-            btn.textContent = 'Sending…';
-            fetch('shop/api/otp.php', {
+            btn.textContent = 'Checking…';
+            loadingEl.style.display = 'block';
+
+            fetch('shop/api/customer-lookup.php', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({action: 'send', phone: phone})
+                body: JSON.stringify({phone: phone})
             })
-            .then(function(r){ return r.json(); })
+            .then(function(r) { return r.json(); })
             .then(function(data) {
                 btn.disabled = false;
-                btn.textContent = 'Send OTP';
-                if (data.success) {
-                    document.getElementById('otp-phone-display').textContent = '+91 ' + phone;
-                    showOTPStep();
-                    startResendTimer();
-                } else {
-                    errEl.textContent = data.message || 'Failed to send OTP.';
+                btn.textContent = 'Continue →';
+                loadingEl.style.display = 'none';
+
+                if (!data.success) {
+                    errEl.textContent = data.message || 'Unable to process. Please try again.';
                     errEl.style.display = 'block';
+                    return;
+                }
+
+                if (data.found && data.user) {
+                    autoFillCheckoutForm(data.user);
+                    var firstName = (data.user.full_name || data.user.name || '').trim().split(/\s+/)[0];
+                    if (firstName) {
+                        var welcomeEl = document.getElementById('phone-welcome');
+                        if (welcomeEl) {
+                            welcomeEl.innerHTML =
+                                '<div class="phone-welcome-msg">' +
+                                '👋 Welcome back, <strong>' + firstName + '</strong>! ' +
+                                'Your saved details have been filled in.' +
+                                '</div>';
+                            welcomeEl.style.display = 'block';
+                        }
+                    }
+                }
+
+                var guestCount = parseInt(data.guest_cart_count) || 0;
+                if (guestCount > 0 && data.found) {
+                    showCartMergeDialog(guestCount, function () { proceedToCheckout(phone); });
+                } else {
+                    // Brief delay so returning users can see the welcome message
+                    setTimeout(function () { proceedToCheckout(phone); }, data.found ? 700 : 0);
                 }
             })
-            .catch(function() {
+            .catch(function () {
                 btn.disabled = false;
-                btn.textContent = 'Send OTP';
+                btn.textContent = 'Continue →';
+                loadingEl.style.display = 'none';
                 errEl.textContent = 'Network error. Please try again.';
                 errEl.style.display = 'block';
             });
         };
-
-        window.handleVerifyOTP = function () {
-            var boxes  = document.querySelectorAll('#otp-boxes .otp-box');
-            var otp    = Array.from(boxes).map(function(b){ return b.value; }).join('');
-            var errEl  = document.getElementById('otp-verify-error');
-            var btn    = document.getElementById('otp-verify-btn');
-            errEl.style.display = 'none';
-            if (otp.length < 6) {
-                errEl.textContent = 'Please enter the complete 6-digit OTP.';
-                errEl.style.display = 'block';
-                return;
-            }
-            btn.disabled = true;
-            btn.textContent = 'Verifying…';
-            fetch('shop/api/otp.php', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({action: 'verify', phone: otpPhone, otp: otp})
-            })
-            .then(function(r){ return r.json(); })
-            .then(function(data) {
-                btn.disabled = false;
-                btn.textContent = 'Verify & Continue';
-                if (data.success) {
-                    if (resendTimer) clearInterval(resendTimer);
-                    autoFillCheckoutForm(data.user || {});
-                    document.getElementById('otp-gate').style.display = 'none';
-                    document.getElementById('checkout-gate').style.display = 'block';
-                    updateStepDone(1);
-                    updateStepDone(2);
-                    updateStepActive(3);
-                    window.scrollTo({top: 0, behavior: 'smooth'});
-                } else {
-                    errEl.textContent = data.message || 'Incorrect OTP. Please try again.';
-                    errEl.style.display = 'block';
-                    boxes.forEach(function(b){ b.style.borderColor = '#dc3545'; });
-                    setTimeout(function(){ boxes.forEach(function(b){ b.style.borderColor = ''; }); }, 800);
-                }
-            })
-            .catch(function() {
-                btn.disabled = false;
-                btn.textContent = 'Verify & Continue';
-                errEl.textContent = 'Network error. Please try again.';
-                errEl.style.display = 'block';
-            });
-        };
-
-        window.handleResendOTP = function () {
-            var errEl = document.getElementById('otp-verify-error');
-            errEl.style.display = 'none';
-            fetch('shop/api/otp.php', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({action: 'resend', phone: otpPhone})
-            })
-            .then(function(r){ return r.json(); })
-            .then(function(data) {
-                if (data.success) {
-                    document.getElementById('otp-resend-link').style.display = 'none';
-                    startResendTimer();
-                    document.querySelectorAll('#otp-boxes .otp-box').forEach(function(b){ b.value = ''; b.classList.remove('filled'); });
-                    document.querySelectorAll('#otp-boxes .otp-box')[0].focus();
-                } else {
-                    errEl.textContent = data.message || 'Could not resend OTP.';
-                    errEl.style.display = 'block';
-                }
-            });
-        };
-
-        window.showPhoneStep = function () {
-            document.getElementById('otp-step-2').style.display = 'none';
-            document.getElementById('otp-step-1').style.display = 'block';
-            setStepClass('step-dot-1', 'active'); setStepClass('step-label-1', 'active');
-            setStepClass('step-dot-2', '');        setStepClass('step-label-2', '');
-            setStepClass('step-line-1', '');
-            if (resendTimer) clearInterval(resendTimer);
-        };
-
-        function showOTPStep() {
-            document.getElementById('otp-step-1').style.display = 'none';
-            document.getElementById('otp-step-2').style.display = 'block';
-            setStepClass('step-dot-1', 'done');   setStepClass('step-label-1', '');
-            setStepClass('step-dot-2', 'active'); setStepClass('step-label-2', 'active');
-            setStepClass('step-line-1', 'done');
-            var first = document.querySelector('#otp-boxes .otp-box');
-            if (first) first.focus();
-        }
-
-        function updateStepDone(n) {
-            setStepClass('step-dot-' + n, 'done'); setStepClass('step-label-' + n, '');
-            if (n < 3) setStepClass('step-line-' + n, 'done');
-        }
-        function updateStepActive(n) {
-            setStepClass('step-dot-' + n, 'active'); setStepClass('step-label-' + n, 'active');
-        }
-        function setStepClass(id, mod) {
-            var el = document.getElementById(id); if (!el) return;
-            var base = id.startsWith('step-dot') ? 'otp-step-dot' : id.startsWith('step-label') ? 'otp-step-label' : 'otp-step-line';
-            el.className = base + (mod ? ' ' + mod : '');
-        }
-
-        function startResendTimer() {
-            var countdown = 30;
-            var timerEl = document.getElementById('otp-resend-timer');
-            var linkEl  = document.getElementById('otp-resend-link');
-            var countEl = document.getElementById('otp-countdown');
-            timerEl.style.display = 'inline'; linkEl.style.display = 'none';
-            countEl.textContent = countdown;
-            if (resendTimer) clearInterval(resendTimer);
-            resendTimer = setInterval(function() {
-                countdown--;
-                countEl.textContent = countdown;
-                if (countdown <= 0) {
-                    clearInterval(resendTimer);
-                    timerEl.style.display = 'none';
-                    linkEl.style.display = 'inline';
-                }
-            }, 1000);
-        }
 
         function autoFillCheckoutForm(user) {
             if (!user) return;
@@ -3127,41 +2969,78 @@ html, body {
             if (user.state) { var st = document.getElementById('state'); if (st) st.value = user.state; }
         }
 
-        document.addEventListener('DOMContentLoaded', function() {
-            var phoneInput = document.getElementById('otp-phone-input');
+        document.addEventListener('DOMContentLoaded', function () {
+            var phoneInput = document.getElementById('phone-input');
             if (phoneInput) {
-                phoneInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); handleSendOTP(); } });
+                phoneInput.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') { e.preventDefault(); handlePhoneContinue(); }
+                });
+                // Only allow digits
+                phoneInput.addEventListener('input', function () {
+                    this.value = this.value.replace(/\D/g, '').slice(0, 10);
+                });
             }
-            var boxes = document.querySelectorAll('#otp-boxes .otp-box');
-            boxes.forEach(function(box, idx) {
-                box.addEventListener('input', function(e) {
-                    var val = e.target.value.replace(/\D/g, '');
-                    e.target.value = val.slice(-1);
-                    e.target.classList.toggle('filled', !!e.target.value);
-                    if (val && idx < boxes.length - 1) boxes[idx + 1].focus();
-                    if (idx === boxes.length - 1 && val) handleVerifyOTP();
-                });
-                box.addEventListener('keydown', function(e) {
-                    if (e.key === 'Backspace' && !e.target.value && idx > 0) {
-                        boxes[idx - 1].focus(); boxes[idx - 1].value = ''; boxes[idx - 1].classList.remove('filled');
-                    }
-                    if (e.key === 'Enter') { e.preventDefault(); handleVerifyOTP(); }
-                });
-                box.addEventListener('paste', function(e) {
-                    e.preventDefault();
-                    var text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
-                    boxes.forEach(function(b, i) { b.value = text[i] || ''; b.classList.toggle('filled', !!b.value); });
-                    if (text.length >= 6) handleVerifyOTP();
-                    else if (text.length > 0) boxes[Math.min(text.length, 5)].focus();
-                });
-            });
         });
     }());
+
+    // ── Phone gate → checkout gate transition ────────────────────────────
+    function proceedToCheckout(phone) {
+        document.getElementById('phone-gate').style.display = 'none';
+        document.getElementById('checkout-gate').style.display = 'block';
+        // Transfer entered phone to the checkout form phone field
+        if (phone) {
+            var phoneField = document.getElementById('phone');
+            if (phoneField && !phoneField.value) phoneField.value = phone;
+        }
+        window.scrollTo({top: 0, behavior: 'smooth'});
+    }
+
+    // ── Cart Merge dialog helpers ─────────────────────────────────────────
+
+    var _mergeDialogCb = null;
+
+    function showCartMergeDialog(guestCount, callback) {
+        _mergeDialogCb = callback;
+        var noun = guestCount === 1 ? '1 item' : guestCount + ' items';
+        document.getElementById('merge-dialog-count').textContent = noun;
+        document.getElementById('cart-merge-overlay').style.display = 'flex';
+    }
+
+    window.handleCartMerge = function(shouldMerge) {
+        document.getElementById('cart-merge-overlay').style.display = 'none';
+        var action = shouldMerge ? 'merge_guest' : 'clear_guest';
+        fetch('shop/api/cart.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({action: action})
+        }).then(function(r){ return r.json(); }).catch(function(){ return {}; }).then(function() {
+            if (_mergeDialogCb) _mergeDialogCb(shouldMerge);
+        });
+    };
 
   </script>
 
   <!-- Razorpay Checkout Script -->
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+  <!-- Cart Merge Dialog -->
+  <div id="cart-merge-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10000;align-items:center;justify-content:center;padding:16px;">
+    <div style="background:#fff;border-radius:20px;padding:32px 24px;max-width:380px;width:100%;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,0.22);animation:mergeDialogPop .3s cubic-bezier(.34,1.56,.64,1) both;">
+      <div style="width:64px;height:64px;background:#f0f4ff;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:30px;">🛒</div>
+      <h3 style="font-size:18px;font-weight:700;color:#1a1a2e;margin:0 0 10px;">Items waiting in your cart</h3>
+      <p style="color:#666;font-size:14px;line-height:1.5;margin:0 0 24px;">You had <strong id="merge-dialog-count">items</strong> before signing in. Want to keep them?</p>
+      <div style="display:flex;gap:12px;">
+        <button onclick="handleCartMerge(false)" style="flex:1;padding:13px 8px;border:2px solid #e0e0e0;background:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;color:#555;transition:all .2s;" onmouseover="this.style.borderColor='#aaa'" onmouseout="this.style.borderColor='#e0e0e0'">Start Fresh</button>
+        <button onclick="handleCartMerge(true)" style="flex:1;padding:13px 8px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;color:#fff;box-shadow:0 4px 14px rgba(102,126,234,.35);">Add All Items ✓</button>
+      </div>
+    </div>
+  </div>
+  <style>
+    @keyframes mergeDialogPop {
+      from { transform: scale(.85); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+  </style>
 
 </body>
 </html>

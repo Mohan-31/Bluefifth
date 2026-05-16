@@ -112,6 +112,21 @@ try {
             handleRemoveCoupon();
             break;
             
+        case 'merge_guest':
+            if (!$isLoggedIn) {
+                echo json_encode(['success' => false, 'message' => 'Not authenticated']);
+                exit;
+            }
+            $ok = mergeGuestCartWithUserCart($userId);
+            $summary = getCartSummary($userId);
+            echo json_encode(['success' => $ok, 'cart_count' => $summary['total_quantity'] ?? 0]);
+            break;
+
+        case 'clear_guest':
+            unset($_SESSION['guest_cart']);
+            echo json_encode(['success' => true]);
+            break;
+
         default:
             sendErrorResponse('Invalid action specified', 400);
             break;
@@ -357,25 +372,19 @@ function handleGetCartItems() {
  */
 function handleGetCartSummary() {
     global $isLoggedIn, $userId;
-    
-    if ($isLoggedIn) {
-        $cartSummary = getCartSummaryWithCombo($userId);
-    } else {
-        $cartSummary = getSessionCartSummaryWithCombo();
-    }
-    
-    // Calculate shipping based on combo price
-    $shippingCost = 0;
-    $freeShippingThreshold = 1000;
-    if ($cartSummary['total'] > 0 && $cartSummary['total'] < $freeShippingThreshold) {
-        $shippingCost = 50;
-    }
-    
-    $cartSummary['shipping_cost'] = $shippingCost;
-    $cartSummary['free_shipping_threshold'] = $freeShippingThreshold;
-    $cartSummary['final_total'] = $cartSummary['total'] + $shippingCost;
-    $cartSummary['free_shipping_eligible'] = $cartSummary['total'] >= $freeShippingThreshold;
-    $cartSummary['free_shipping_remaining'] = max(0, $freeShippingThreshold - $cartSummary['total']);
+
+    $cartSummary = $isLoggedIn ? getCartSummary($userId) : getSessionCartSummary();
+    $total = $cartSummary['total_amount'] ?? 0;
+
+    $freeShippingThreshold = (float) getSetting('free_shipping_threshold', 1000);
+    $shippingCost = ($total > 0 && $total < $freeShippingThreshold) ? 50 : 0;
+
+    $cartSummary['shipping_cost']            = $shippingCost;
+    $cartSummary['free_shipping_threshold']  = $freeShippingThreshold;
+    $cartSummary['final_total']              = $total + $shippingCost;
+    $cartSummary['free_shipping_eligible']   = $total >= $freeShippingThreshold;
+    $cartSummary['free_shipping_remaining']  = max(0, $freeShippingThreshold - $total);
+    $cartSummary['total']                    = $total;
     
     sendSuccessResponse('Cart summary retrieved successfully', [
         'cart_summary' => $cartSummary

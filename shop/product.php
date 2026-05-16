@@ -775,26 +775,17 @@ $productReviews = getProductReviews($productId);
         .img-responsive{
             width:150px;
         }
-        .nav-align{
-            margin-top:100px;
-        }
         /* Tablet View (min-width: 768px) */
         @media (min-width: 768px) {
         .img-responsive{
             width:150px;
         }
-        .nav-align{
-            margin-top:100px;
         }
-        }
-        
+
         /* Laptop/Desktop View (min-width: 1024px or 1200px) */
         @media (min-width: 1024px) {
         .img-responsive{
             width:200px;
-        }
-        .nav-align{
-            margin-top:200px;
         }
         }
         
@@ -1580,8 +1571,6 @@ $productReviews = getProductReviews($productId);
     <!-- Scripts -->
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-
     <!-- ===== NAVBAR JAVASCRIPT (Add before closing </body> tag) ===== -->
     <script>
     // SIMPLIFIED AUTH FOR NON-INDEX PAGES

@@ -371,16 +371,10 @@ $seoMeta = getCategorySEOMeta($category);
 .img-responsive{
     width:150px;
 }
-.nav-align{
-    margin-top:150px;
-}
 /* Tablet View (min-width: 768px) */
 @media (min-width: 768px) {
 .img-responsive{
     width:150px;
-}
-.nav-align{
-    margin-top:160px;
 }
 }
 
@@ -388,9 +382,6 @@ $seoMeta = getCategorySEOMeta($category);
 @media (min-width: 1024px) {
 .img-responsive{
     width:200px;
-}
-.nav-align{
-    margin-top:220px;
 }
 }
 
@@ -1944,9 +1935,6 @@ if (currentUser) {
 
 console.log('🎉 Complete integrated authentication and shopping system loaded');
 </script>
-
-    <!-- Google Sign-In Script -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <!-- JAVASCRIPT -->
     <script>
