@@ -14,7 +14,7 @@ if (getSetting('maintenance_mode') === 'true') {
     
     if (!$isAdmin) {
         // Show maintenance page to non-admin users
-        include 'maintenance.html';
+        include '../static/maintenance.html';
         exit;
     }
 }
@@ -545,65 +545,36 @@ $seoMeta = getCategorySEOMeta($category);
         <div class="row ">
             <?php if (!empty($products)): ?>
                 <?php foreach ($products as $product): ?>
-                    <div  class="product-card p-2 justify-content-around col-6 col-md-6 col-lg-3 mb-4">
-                        <a href="product.php?id=<?= $product['id'] ?>" class="text-decoration-none text-dark" >
+                    <div class="product-card p-2 col-6 col-md-6 col-lg-3 mb-4">
+                        <a href="product.php?id=<?= $product['id'] ?>" class="text-decoration-none text-dark">
                             <div class="image-container rounded-0">
-                                <img src="<?= htmlspecialchars($product['primary_image'] ?: '../assets/images/default-product.jpg') ?>" 
-                                     alt="<?= htmlspecialchars($product['name']) ?>" class="default-img rounded-0 ">
-                                <img src="<?= htmlspecialchars($product['primary_image'] ?: '../assets/images/default-product.jpg') ?>" 
+                                <img src="<?= htmlspecialchars($product['primary_image'] ?: '../assets/images/default-product.jpg') ?>"
+                                     alt="<?= htmlspecialchars($product['name']) ?>" class="default-img rounded-0">
+                                <img src="<?= htmlspecialchars($product['primary_image'] ?: '../assets/images/default-product.jpg') ?>"
                                      alt="<?= htmlspecialchars($product['name']) ?>" class="hover-img h-100">
-                                     
-                                     <?php if (isset($product['stock_status'])): ?>
-                                        <?php if ($product['stock_status'] === 'out_of_stock'): ?>
-                                            <span class="stock-badge badge-danger">Out of Stock</span>
-                                        <?php elseif ($product['stock_status'] === 'low_stock'): ?>
-                                            <span class="stock-badge badge-warning">Low Stock</span>
-                                        <?php endif; ?>
-                                    <?php endif; ?>
-                            </div>
-                            <h5 class="product-title  d-flex justify-content-between align-items-center ">
-                                <span class="pl-2 text-dark" ><?= htmlspecialchars($product['name']) ?></span>  
-                                <span class="pr-2  d-none ">
-                                    <?php if (isset($product['stock_status'])): ?>
-                                        <?php if ($product['stock_status'] === 'out_of_stock'): ?>
-                                            <span class="badge badge-danger">Out of Stock</span>
-                                        <?php elseif ($product['stock_status'] === 'low_stock'): ?>
-                                            <span class="badge badge-warning">Low Stock</span>
-                                        <?php endif; ?>
-                                    <?php endif; ?>
-                                </span>
-                            </h5>
-                            <div class="d-none">
                                 <?php if (isset($product['stock_status'])): ?>
-                                            <?php if ($product['stock_status'] === 'out_of_stock'): ?>
-                                                <p class="text-left pl-2 d-block d-lg-none" >
-                                                    <span class="badge badge-danger ">Out of Stock</span>
-                                                </p
-                                            <?php elseif ($product['stock_status'] === 'low_stock'): ?>
-                                                <p class="text-left pl-2 d-block d-lg-none">
-                                                    <span class="badge badge-warning">Low Stock</span>
-                                                </p>
-                                            <?php endif; ?>
+                                    <?php if ($product['stock_status'] === 'out_of_stock'): ?>
+                                        <span class="stock-badge badge-danger">Out of Stock</span>
+                                    <?php elseif ($product['stock_status'] === 'low_stock'): ?>
+                                        <span class="stock-badge badge-warning">Low Stock</span>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </div>
-                            <p class="product-price text-left pl-2" >₹<?= number_format($product['price'], 2) ?></p>
-                            
-                            
-                            
-                            <?php 
-                            $sizes = $product['sizes'] ? json_decode($product['sizes'], true) : ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-                            $defaultSize = !empty($sizes) ? $sizes[0] : 'XS';
-                            ?>
-                            
-                            <span class="size-label text-left pl-2 d-none">Size: <strong><?= $defaultSize ?></strong></span>
-                            <div class="btn-group btn-group-toggle size-options d-none" style=";" data-toggle="buttons">
-                              <?php foreach ($sizes as $index => $size): ?>
-                                  <label style="width:26px;" class="pl-0 pr-0 btn btn-outline-dark <?= $index === 0 ? 'active' : '' ?>">
-                                    <input type="radio" name="size<?= $product['id'] ?>" <?= $index === 0 ? 'checked' : '' ?>> <?= $size ?>
-                                  </label>
-                              <?php endforeach; ?>
+                            <h5 class="product-title"><?= htmlspecialchars($product['name']) ?></h5>
+                            <p class="product-price text-left pl-2">₹<?= number_format($product['price'], 2) ?></p>
+                        </a>
+                        <?php
+                        $sizes = $product['sizes'] ? json_decode($product['sizes'], true) : ['S', 'M', 'L', 'XL', 'XXL'];
+                        ?>
+                        <div class="px-2 pb-1">
+                            <div class="btn-group btn-group-toggle size-options" data-toggle="buttons">
+                                <?php foreach ($sizes as $index => $size): ?>
+                                    <label class="btn btn-outline-dark btn-sm grid-size-btn <?= $index === 0 ? 'active' : '' ?>">
+                                        <input type="radio" name="size<?= $product['id'] ?>" <?= $index === 0 ? 'checked' : '' ?>> <?= $size ?>
+                                    </label>
+                                <?php endforeach; ?>
                             </div>
-                             <!-- Add to Cart Button (Outside the link) -->
+                        </div>
                         <?php if ($product['stock_status'] !== 'out_of_stock'): ?>
                             <button class="add-to-cart" onclick="addToCartFromGrid(event, <?= $product['id'] ?>)">
                                 <i class="fas fa-shopping-cart"></i> Add To Cart
@@ -613,9 +584,6 @@ $seoMeta = getCategorySEOMeta($category);
                                 <i class="fas fa-times"></i> Out of Stock
                             </button>
                         <?php endif; ?>
-                        </a>
-                        
-                       
                     </div>
                 <?php endforeach; ?>
             <?php else: ?>

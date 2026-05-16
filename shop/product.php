@@ -12,7 +12,7 @@ if (getSetting('maintenance_mode') === 'true') {
     
     if (!$isAdmin) {
         // Show maintenance page to non-admin users
-        include 'maintenance.html';
+        include '../static/maintenance.html';
         exit;
     }
 }
@@ -1077,35 +1077,32 @@ $productReviews = getProductReviews($productId);
             <div class="container mb-5 p-0 pb-5">
                 <div class="row">
                     <?php foreach ($relatedProducts as $relatedProduct): ?>
-                        <div class="product-card col-6 col-md-6 col-lg-3">
-                            <a class="text-decoration-none" href="product.php?id=<?= $relatedProduct['id'] ?>">
+                        <div class="product-card p-2 col-6 col-md-6 col-lg-3 mb-4">
+                            <a class="text-decoration-none text-dark" href="product.php?id=<?= $relatedProduct['id'] ?>">
                                 <div class="image-container rounded-0">
-                                    <img src="<?= htmlspecialchars($relatedProduct['primary_image'] ?: '../assets/images/default-product.jpg') ?>" 
+                                    <img src="<?= htmlspecialchars($relatedProduct['primary_image'] ?: '../assets/images/default-product.jpg') ?>"
                                          alt="<?= htmlspecialchars($relatedProduct['name']) ?>" class="default-img rounded-0">
-                                    <img src="<?= htmlspecialchars($relatedProduct['primary_image'] ?: '../assets/images/default-product.jpg') ?>" 
+                                    <img src="<?= htmlspecialchars($relatedProduct['primary_image'] ?: '../assets/images/default-product.jpg') ?>"
                                          alt="<?= htmlspecialchars($relatedProduct['name']) ?>" class="hover-img h-100 rounded-0">
                                 </div>
-                                <h5 class="product-title text-left text-dark"  ><?= htmlspecialchars($relatedProduct['name']) ?></h5>
-                                <p class="product-price text-left">₹<?= number_format($relatedProduct['price'], 2) ?></p>
-                                
-                                <?php 
-                                $relatedSizes = $relatedProduct['sizes'] ? json_decode($relatedProduct['sizes'], true) : [];
-                                if (!empty($relatedSizes)): 
-                                ?>
-                                    <span class="size-label text-left text-dark">Size: <strong><?= $relatedSizes[0] ?></strong></span>
-                                    <div class="btn-group btn-group-toggle size-options" data-toggle="buttons">
-                                        <?php foreach ($relatedSizes as $idx => $size): ?>
-                                            <label style="width:26px;" class="pl-0 pr-0 btn btn-outline-dark <?= $idx === 0 ? 'active' : '' ?>">
-                                                <input type="radio" name="size_<?= $relatedProduct['id'] ?>" <?= $idx === 0 ? 'checked' : '' ?>> <?= $size ?>
-                                            </label>
-                                        <?php endforeach; ?>
-                                    </div>
-                                <?php endif; ?>
-                                
-                                <button class="add-to-cart" onclick="addRelatedToCart(event, <?= $relatedProduct['id'] ?>)">
-                                    <i class="fas fa-shopping-bag"></i> Add To Cart
-                                </button>
+                                <h5 class="product-title"><?= htmlspecialchars($relatedProduct['name']) ?></h5>
+                                <p class="product-price text-left pl-2">₹<?= number_format($relatedProduct['price'], 2) ?></p>
                             </a>
+                            <?php
+                            $relatedSizes = $relatedProduct['sizes'] ? json_decode($relatedProduct['sizes'], true) : ['S', 'M', 'L', 'XL', 'XXL'];
+                            ?>
+                            <div class="px-2 pb-1">
+                                <div class="btn-group btn-group-toggle size-options" data-toggle="buttons">
+                                    <?php foreach ($relatedSizes as $idx => $size): ?>
+                                        <label class="btn btn-outline-dark btn-sm grid-size-btn <?= $idx === 0 ? 'active' : '' ?>">
+                                            <input type="radio" name="size_<?= $relatedProduct['id'] ?>" <?= $idx === 0 ? 'checked' : '' ?>> <?= $size ?>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                            <button class="add-to-cart" onclick="addRelatedToCart(event, <?= $relatedProduct['id'] ?>)">
+                                <i class="fas fa-shopping-bag"></i> Add To Cart
+                            </button>
                         </div>
                     <?php endforeach; ?>
                 </div>

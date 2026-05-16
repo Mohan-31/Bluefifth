@@ -1,9 +1,9 @@
 <?php
 // return-webhook.php
 
-require_once __DIR__ . "/includes/database.php";
-require_once __DIR__ . "/includes/functions.php";
-require_once __DIR__ . "/includes/config.php";
+require_once __DIR__ . "/../includes/database.php";
+require_once __DIR__ . "/../includes/functions.php";
+require_once __DIR__ . "/../includes/config.php";
 
 // Token defined in includes/config.php (SHIPROCKET_RETURN_WEBHOOK_TOKEN)
 $expectedToken = SHIPROCKET_RETURN_WEBHOOK_TOKEN;

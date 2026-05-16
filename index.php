@@ -17,7 +17,7 @@ if (getSetting('maintenance_mode') === 'true') {
     
     if (!$isAdmin) {
         // Show maintenance page to non-admin users
-        include 'maintenance.html';
+        include 'static/maintenance.html';
         exit;
     }
 }
@@ -424,17 +424,31 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
             width: 100vw;
         }
         
-        /* Tablet and above (≥768px) */
-        @media (min-width: 768px) {
+        /* Tablet (768px–991px) */
+        @media (min-width: 768px) and (max-width: 991px) {
             .banner-bg {
                 background-image: url('/ecommerce-project/assets/images/banner-head2.png');
                 background-repeat: no-repeat;
                 background-position: center;
-                background-size: contain;
-                height: 120vh;
+                background-size: cover;
+                height: 80vh;
             }
             .bg-align{
-                height: 180vh;
+                height: 80vh;
+                width: 100vw;
+             }
+        }
+        /* Desktop (≥992px) */
+        @media (min-width: 992px) {
+            .banner-bg {
+                background-image: url('/ecommerce-project/assets/images/banner-head2.png');
+                background-repeat: no-repeat;
+                background-position: center;
+                background-size: cover;
+                height: 95vh;
+            }
+            .bg-align{
+                height: 95vh;
                 width: 100vw;
              }
         }

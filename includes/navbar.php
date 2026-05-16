@@ -158,8 +158,8 @@ $basePath = '/ecommerce-project/';
         /* ── Body offset for fixed navbar ──
            mobile / tablet (collapsed 1-row nav): 48px banners + ~62px nav  = 110px
            desktop (≥992px, 2-row expanded nav):  48px banners + ~112px nav = 160px  */
-        .nav-align { margin-top: 130px; }
-        @media (min-width: 992px) { .nav-align { margin-top: 185px; } }
+        .nav-align { margin-top: 135px; }
+        @media (min-width: 992px) { .nav-align { margin-top: 190px; } }
 
 </style>
 <!-- Silent Authentication Loading -->

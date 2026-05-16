@@ -5486,11 +5486,11 @@ function checkMaintenanceModeAndRedirect() {
         if ($maintenanceMode && !$isAdmin) {
             // Try different possible paths for maintenance.html
             $possiblePaths = [
-                __DIR__ . '/../maintenance.html',  // If functions.php is in includes/
-                __DIR__ . '/maintenance.html',     // If functions.php is in root
+                __DIR__ . '/../static/maintenance.html', // primary: static/ folder
+                __DIR__ . '/../maintenance.html',        // legacy root fallback
+                __DIR__ . '/maintenance.html',
+                $_SERVER['DOCUMENT_ROOT'] . '/ecommerce-project/static/maintenance.html',
                 $_SERVER['DOCUMENT_ROOT'] . '/maintenance.html',
-                './maintenance.html',
-                '../maintenance.html'
             ];
             
             $foundPath = null;
