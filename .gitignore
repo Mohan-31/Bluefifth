@@ -1,0 +1,20 @@
+# ── Secrets — NEVER commit these ─────────────────────────────
+.env
+*.env.local
+
+# ── Uploads (user content) ───────────────────────────────────
+uploads/
+
+# ── PHP / Server logs ─────────────────────────────────────────
+*.log
+error_log
+
+# ── OS junk ──────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE ───────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp

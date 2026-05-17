@@ -6,6 +6,25 @@
 // For production: https://bluefifth.in
 // ============================================================
 
+// Simple .env loader — reads .env from project root if it exists.
+// Works on XAMPP, shared hosting (InfinityFree), and any server.
+// Does NOT overwrite env vars already set by the host/server.
+(static function () {
+    $f = __DIR__ . '/../.env';
+    if (!file_exists($f)) return;
+    foreach (file($f, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#' || strpos($line, '=') === false) continue;
+        [$k, $v] = explode('=', $line, 2);
+        $k = trim($k); $v = trim($v);
+        if ($k !== '' && !array_key_exists($k, $_SERVER)) {
+            putenv("$k=$v");
+            $_ENV[$k]    = $v;
+            $_SERVER[$k] = $v;
+        }
+    }
+})();
+
 define('BASE_URL', getenv('BASE_URL') ?: 'http://localhost/ecommerce-project');
 // BASE_PATH: URL-path prefix for all internal links.
 // Vercel (domain root): set BASE_PATH=  (empty) or BASE_PATH=/
@@ -13,7 +32,7 @@ define('BASE_URL', getenv('BASE_URL') ?: 'http://localhost/ecommerce-project');
 define('BASE_PATH', rtrim(getenv('BASE_PATH') !== false ? (string)getenv('BASE_PATH') : '/ecommerce-project', '/'));
 define('SITE_NAME', 'bluefifth');
 define('SITE_URL',   BASE_URL);
-define('ADMIN_EMAIL', 'velonauk@gmail.com');
+define('ADMIN_EMAIL', getenv('ADMIN_EMAIL') ?: 'immohan017@gmail.com');
 
 // ============================================================
 // GOOGLE OAUTH — DEPRECATED
