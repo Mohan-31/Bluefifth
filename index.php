@@ -630,9 +630,9 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
                             <span class="size-label text-left pl-4 text-dark d-none">Size: <strong class="selected-size"><?= $defaultSize ?></strong></span>
                             
                             <?php if (!empty($sizes)): ?>
-                                <div class="btn-group btn-group-toggle size-options d-none" data-toggle="buttons">
+                                <div class="btn-group btn-group-toggle size-options pl-4" data-toggle="buttons">
                                     <?php foreach ($sizes as $index => $size): ?>
-                                        <label class="btn btn-outline-dark <?= $index === 0 ? 'active' : '' ?>">
+                                        <label class="btn btn-outline-dark grid-size-btn <?= $index === 0 ? 'active' : '' ?>">
                                             <input type="radio" name="size_<?= $product['id'] ?>" value="<?= $size ?>" <?= $index === 0 ? 'checked' : '' ?>> <?= $size ?>
                                         </label>
                                     <?php endforeach; ?>

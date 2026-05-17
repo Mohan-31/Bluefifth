@@ -156,10 +156,12 @@ $basePath = '/ecommerce-project/';
         }
 
         /* ── Body offset for fixed navbar ──
-           mobile / tablet (collapsed 1-row nav): 48px banners + ~62px nav  = 110px
-           desktop (≥992px, 2-row expanded nav):  48px banners + ~112px nav = 160px  */
-        .nav-align { margin-top: 135px; }
-        @media (min-width: 992px) { .nav-align { margin-top: 190px; } }
+           mobile  (collapsed 1-row nav):  48px banners + ~62px nav  = 110px → +42px breathing
+           tablet  (768px–991px):          48px banners + ~68px nav  = 116px → +42px breathing
+           desktop (≥992px, 2-row nav):    48px banners + ~112px nav = 160px → +36px breathing */
+        .nav-align { margin-top: 152px; }
+        @media (min-width: 768px)  { .nav-align { margin-top: 158px; } }
+        @media (min-width: 992px)  { .nav-align { margin-top: 196px; } }
 
 </style>
 <!-- Silent Authentication Loading -->
