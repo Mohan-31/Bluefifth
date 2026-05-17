@@ -7,6 +7,10 @@
 // ============================================================
 
 define('BASE_URL', getenv('BASE_URL') ?: 'http://localhost/ecommerce-project');
+// BASE_PATH: URL-path prefix for all internal links.
+// Vercel (domain root): set BASE_PATH=  (empty) or BASE_PATH=/
+// XAMPP local:          leave unset → defaults to /ecommerce-project
+define('BASE_PATH', rtrim(getenv('BASE_PATH') !== false ? (string)getenv('BASE_PATH') : '/ecommerce-project', '/'));
 define('SITE_NAME', 'bluefifth');
 define('SITE_URL',   BASE_URL);
 define('ADMIN_EMAIL', 'velonauk@gmail.com');

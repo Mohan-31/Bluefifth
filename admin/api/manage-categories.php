@@ -406,7 +406,7 @@ function handleCategoryImageUpload($file) {
         
         // Upload file
         if (move_uploaded_file($file['tmp_name'], $filepath)) {
-            $imageUrl = '/ecommerce-project/uploads/categories/' . $filename;
+            $imageUrl = BASE_PATH . '/uploads/categories/' . $filename;
             
             return [
                 'success' => true,

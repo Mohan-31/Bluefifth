@@ -623,7 +623,7 @@ if (isset($_POST['save_profile'])) {
     <div class="card-header d-flex justify-content-between align-items-center"
          style="background: linear-gradient(to right, #6C803F, #879D60); color: white; border-radius: 1rem 1rem 0 0; padding: 1rem 1.5rem;">
       <h5 class="mb-0"><i class="fas fa-shopping-bag mr-2"></i>Recent Orders</h5>
-      <a href="/ecommerce-project/account/orders.php" class="btn btn-sm btn-light" style="font-size:0.85rem; border-radius:8px;">View All</a>
+      <a href="<?= BASE_PATH ?>/account/orders.php" class="btn btn-sm btn-light" style="font-size:0.85rem; border-radius:8px;">View All</a>
     </div>
     <div class="card-body p-0">
       <?php if (empty($recentOrders)): ?>
@@ -631,7 +631,7 @@ if (isset($_POST['save_profile'])) {
           <i class="fas fa-shopping-bag fa-3x text-muted mb-3" style="display:block;"></i>
           <h5 class="text-muted mb-2">No orders yet</h5>
           <p class="text-muted mb-4">Start shopping to see your recent orders here.</p>
-          <a href="/ecommerce-project/shop/category.php" class="btn btn-primary">Start Shopping</a>
+          <a href="<?= BASE_PATH ?>/shop/category.php" class="btn btn-primary">Start Shopping</a>
         </div>
       <?php else: ?>
         <?php
@@ -676,13 +676,13 @@ if (isset($_POST['save_profile'])) {
             <div style="font-weight:700; font-size:1rem; color:#333;">
               ₹<?= number_format($recentOrder['final_amount'], 2) ?>
             </div>
-            <a href="/ecommerce-project/track.php?order=<?= urlencode($recentOrder['order_number']) ?>" class="btn btn-sm btn-outline-primary mt-1"
+            <a href="<?= BASE_PATH ?>/track.php?order=<?= urlencode($recentOrder['order_number']) ?>" class="btn btn-sm btn-outline-primary mt-1"
                style="font-size:0.78rem; padding:3px 10px; border-radius:8px;">Track</a>
           </div>
         </div>
         <?php endforeach; ?>
         <div class="text-center py-3">
-          <a href="/ecommerce-project/account/orders.php" class="btn btn-outline-secondary btn-sm">
+          <a href="<?= BASE_PATH ?>/account/orders.php" class="btn btn-outline-secondary btn-sm">
             <i class="fas fa-list mr-1"></i>View All Orders
           </a>
         </div>

@@ -414,7 +414,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
         
         /* Default (mobile first) */
         .banner-bg {
-            background-image: url('/ecommerce-project/assets/images/banner-head-mob.png');
+            background-image: url('<?= BASE_PATH ?>/assets/images/banner-head-mob.png');
             width: 100vw;
             height: auto;
             background-size: cover;
@@ -427,7 +427,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
         /* Tablet (768px–991px) */
         @media (min-width: 768px) and (max-width: 991px) {
             .banner-bg {
-                background-image: url('/ecommerce-project/assets/images/banner-head2.png');
+                background-image: url('<?= BASE_PATH ?>/assets/images/banner-head2.png');
                 background-repeat: no-repeat;
                 background-position: center;
                 background-size: cover;
@@ -441,7 +441,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
         /* Desktop (≥992px) */
         @media (min-width: 992px) {
             .banner-bg {
-                background-image: url('/ecommerce-project/assets/images/banner-head2.png');
+                background-image: url('<?= BASE_PATH ?>/assets/images/banner-head2.png');
                 background-repeat: no-repeat;
                 background-position: center;
                 background-size: cover;
@@ -876,8 +876,8 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
                 <div class="footer-logo">
                     <img class="" src="./assets/images/logo3.png" width="160px" alt="Velona">
                 </div>
-                <a href="/ecommerce-project/index.php" class="mt-5">HOME</a>
-                <a href="/ecommerce-project/includes/about.php">ABOUT US</a>
+                <a href="<?= BASE_PATH ?>/index.php" class="mt-5">HOME</a>
+                <a href="<?= BASE_PATH ?>/includes/about.php">ABOUT US</a>
                 <a href="#" data-toggle="modal" data-target="#contactUsModal">CONTACT US</a>
             </div>
             <style>
@@ -907,7 +907,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
                     <button type="submit" class="subscribe-btn">Subscribe</button>
                 </form>
                 <div class="payments mt-4">
-                    <img src="/ecommerce-project/assets/images/payment-methods.png" alt="payment">
+                    <img src="<?= BASE_PATH ?>/assets/images/payment-methods.png" alt="payment">
                 </div>
             </div>
         </div>

@@ -2,7 +2,8 @@
 // BULLETPROOF: Complete error handling + ALL existing functions preserved + E-commerce integration
 
 
-require_once 'database.php';
+require_once __DIR__ . '/database.php';
+require_once __DIR__ . '/config.php';
 
 // ============================================================================
 // DATABASE CONNECTION AND CORE UTILITIES
@@ -7902,7 +7903,7 @@ function getSessionCartItems() {
                 }
 
                 if (empty($primaryImage)) {
-                    $primaryImage = '/ecommerce-project/assets/images/default-product.jpg';
+                    $primaryImage = BASE_PATH . '/assets/images/default-product.jpg';
                 }
                 
                 $cartItems[] = [

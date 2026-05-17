@@ -14,7 +14,7 @@ $cartSummary = $cartSummary ?? ['item_count' => 0];
 $walletBalance = $walletBalance ?? ['points' => 0, 'pending_points' => 0];
 $siteName = $siteName ?? 'Bluefifth';
 
-$basePath = '/ecommerce-project/';
+$basePath = BASE_PATH . '/';
 
 ?>
 <style>
@@ -185,8 +185,8 @@ $basePath = '/ecommerce-project/';
             </div>
 
             <div class="text-center ">
-                <a class="navbar-brand mx-auto " href="/ecommerce-project/index.php">
-                    <img src="/ecommerce-project/assets/images/logo.jpg" class="mb-1  img-responsive" alt="<?= htmlspecialchars($siteName) ?>" >
+                <a class="navbar-brand mx-auto " href="<?= $basePath ?>index.php">
+                    <img src="<?= $basePath ?>assets/images/logo.jpg" class="mb-1  img-responsive" alt="<?= htmlspecialchars($siteName) ?>" >
                 </a>
             </div>
 
@@ -209,7 +209,7 @@ $basePath = '/ecommerce-project/';
                                 <br><small class="text-muted"><?= htmlspecialchars($currentUser['email'] ?? '') ?></small>
                             </div>
                             <div class="dropdown-divider"></div>
-                            <a class="dropdown-item" href="/ecommerce-project/profile.php">
+                            <a class="dropdown-item" href="<?= $basePath ?>profile.php">
                                 <i class="fas fa-user mr-2"></i>My Profile
                             </a>
                             <a class="dropdown-item" href="javascript:void(0)" onclick="showReferralPopup()">
@@ -218,7 +218,7 @@ $basePath = '/ecommerce-project/';
                             <a class="dropdown-item" href="javascript:void(0)" onclick="showWalletPopup()">
                                 <i class="fas fa-wallet mr-2"></i>My Wallet
                             </a>
-                            <a class="dropdown-item" href="/ecommerce-project/account/orders.php">
+                            <a class="dropdown-item" href="<?= $basePath ?>account/orders.php">
                                 <i class="fas fa-shopping-bag mr-2"></i>My Orders
                             </a>
                             <div class="dropdown-divider"></div>
@@ -244,7 +244,7 @@ $basePath = '/ecommerce-project/';
                             <a class="dropdown-item" href="javascript:void(0)" onclick="showWalletPopup()">
                                 <i class="fas fa-wallet mr-2"></i>My Wallet
                             </a>
-                            <a class="dropdown-item" href="/ecommerce-project/account/orders.php">
+                            <a class="dropdown-item" href="<?= $basePath ?>account/orders.php">
                                 <i class="fas fa-shopping-bag mr-2"></i>My Orders
                             </a>
                             <div class="dropdown-divider"></div>
@@ -260,7 +260,7 @@ $basePath = '/ecommerce-project/';
                 <i class="fa-solid fa-magnifying-glass fa-xl" style="color: #000000; cursor: pointer;" onclick="toggleSearch()"></i>
             </div>
                 <!-- Shopping Cart -->
-                <a href="/ecommerce-project/shop/cart.php" class="position-relative ">
+                <a href="<?= $basePath ?>shop/cart.php" class="position-relative ">
                     <i class="fa-solid fa-cart-shopping fa-xl" style="color: #000000; "></i>
                     <?php if ($cartSummary['item_count'] > 0): ?>
                         <span class="position-absolute badge badge-danger" style="top: -8px; right: -8px; font-size: 0.7rem;">
@@ -276,7 +276,7 @@ $basePath = '/ecommerce-project/';
             <div class="collapse navbar-collapse justify-content-between" id="navbarSupportedContent">
                 <ul class="navbar-nav m-auto">
                     <li class="nav-item ">
-                        <a class="nav-link nav-link-st" href="/ecommerce-project/index.php">HOME</a>
+                        <a class="nav-link nav-link-st" href="<?= $basePath ?>index.php">HOME</a>
                     </li>
                     
                     <!-- Dynamic Categories -->
@@ -292,18 +292,18 @@ $basePath = '/ecommerce-project/';
                         ?>
                         <li class="nav-item">
                             <a class="nav-link nav-link-st <?= $isActive ? 'active' : '' ?>"
-                               href="/ecommerce-project/shop/category.php?category=<?= urlencode($category['slug']) ?>">
+                               href="<?= $basePath ?>shop/category.php?category=<?= urlencode($category['slug']) ?>">
                                 <?= strtoupper(htmlspecialchars($category['name'])) ?>
                             </a>
                         </li>
                     <?php endforeach; ?>
                     
                     <li class="nav-item">
-                        <a class="nav-link nav-link-st" href="/ecommerce-project/includes/blog.php">BLOG</a>
+                        <a class="nav-link nav-link-st" href="<?= $basePath ?>includes/blog.php">BLOG</a>
                     </li>
 
                     <li class="nav-item">
-                        <a class="nav-link nav-link-st" href="/ecommerce-project/includes/about.php">ABOUT US</a>
+                        <a class="nav-link nav-link-st" href="<?= $basePath ?>includes/about.php">ABOUT US</a>
                     </li>
                     
                     <!-- Mobile User Menu -->
@@ -315,7 +315,7 @@ $basePath = '/ecommerce-project/';
                             </div>
                         </li>
                         <li class="nav-item d-lg-none d-block">
-                            <a href="/ecommerce-project/profile.php" class="nav-link">
+                            <a href="<?= $basePath ?>profile.php" class="nav-link">
                                 <i class="fa-regular fa-chart-line mr-2"></i>My Profile
                             </a>
                         </li>
@@ -330,7 +330,7 @@ $basePath = '/ecommerce-project/';
                             </a>
                         </li>
                         <li class="nav-item d-lg-none d-block">
-                            <a href="/ecommerce-project/account/orders.php" class="nav-link">
+                            <a href="<?= $basePath ?>account/orders.php" class="nav-link">
                                 <i class="fa-regular fa-shopping-bag mr-2"></i>My Orders
                             </a>
                         </li>
@@ -357,7 +357,7 @@ $basePath = '/ecommerce-project/';
                             </a>
                         </li>
                         <li class="nav-item d-lg-none d-block">
-                            <a href="/ecommerce-project/account/orders.php" class="nav-link">
+                            <a href="<?= $basePath ?>account/orders.php" class="nav-link">
                                 <i class="fa-regular fa-shopping-bag mr-2"></i>My Orders
                             </a>
                         </li>
@@ -421,8 +421,8 @@ $basePath = '/ecommerce-project/';
         <div style="font-size: 48px; margin-bottom: 12px;">🛍️</div>
         <h4 style="font-weight:700; color:#333; margin-bottom:8px;">No login needed to browse!</h4>
         <p class="text-muted mb-4">Just add products to your cart and we'll verify your phone at checkout — fast and secure.</p>
-        <a href="/ecommerce-project/shop/category.php" class="btn btn-dark btn-block mb-3" onclick="closeAllPopups()">Continue Shopping</a>
-        <a href="/ecommerce-project/checkout.php" class="btn btn-outline-secondary btn-block" onclick="closeAllPopups()">Go to Checkout</a>
+        <a href="<?= $basePath ?>shop/category.php" class="btn btn-dark btn-block mb-3" onclick="closeAllPopups()">Continue Shopping</a>
+        <a href="<?= $basePath ?>checkout.php" class="btn btn-outline-secondary btn-block" onclick="closeAllPopups()">Go to Checkout</a>
         <div class="mt-4 pt-3 border-top">
             <small class="text-muted">Your identity is verified via OTP at checkout</small>
         </div>
@@ -494,7 +494,7 @@ async function performSearch() {
         const currentUrl = window.location.href;
         let apiPath;
         
-        apiPath = '/ecommerce-project/shop/api/search.php';
+        apiPath = '<?= $basePath ?>shop/api/search.php';
         
         console.log('🔍 Search from:', currentUrl);
         console.log('🔍 Using API path:', apiPath);
@@ -539,8 +539,8 @@ function displaySearchResults(products) {
         return;
     }
 
-    const productBasePath = '/ecommerce-project/shop/';
-    const imageBasePath = '/ecommerce-project/';
+    const productBasePath = '<?= $basePath ?>shop/';
+    const imageBasePath = '<?= $basePath ?>';
 
     let html = '<div class="row">';
     products.forEach(product => {
@@ -596,7 +596,7 @@ async function subscribeNewsletter(event) {
         const currentUrl = window.location.href;
         let apiPath;
         
-        apiPath = '/ecommerce-project/api/newsletter.php';
+        apiPath = '<?= $basePath ?>api/newsletter.php';
         
         const response = await fetch(apiPath, {
             method: 'POST',
@@ -758,7 +758,7 @@ function showWalletPopup() {
 
 function logoutUser() {
     if (!confirm('Are you sure you want to logout?')) return;
-    fetch('/ecommerce-project/auth/logout.php', {
+    fetch('<?= $basePath ?>auth/logout.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'}
     })
