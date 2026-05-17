@@ -1,0 +1,16 @@
+{
+  "functions": {
+    "**/*.php": {
+      "runtime": "vercel-php@0.7.2"
+    }
+  },
+  "rewrites": [
+    { "source": "/", "destination": "/index.php" },
+    { "source": "/shop/(.*)", "destination": "/shop/$1" },
+    { "source": "/admin/(.*)", "destination": "/admin/$1" },
+    { "source": "/auth/(.*)", "destination": "/auth/$1" },
+    { "source": "/account/(.*)", "destination": "/account/$1" },
+    { "source": "/includes/(.*)", "destination": "/includes/$1" },
+    { "source": "/webhooks/(.*)", "destination": "/webhooks/$1" }
+  ]
+}

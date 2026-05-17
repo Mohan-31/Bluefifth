@@ -1,8 +1,8 @@
 <?php
-$host = "localhost";
-$dbname = "ecommerce_referral_db";
-$username = "root";
-$password = "";
+$host     = getenv('DB_HOST')     ?: 'localhost';
+$dbname   = getenv('DB_NAME')     ?: 'ecommerce_referral_db';
+$username = getenv('DB_USER')     ?: 'root';
+$password = getenv('DB_PASSWORD') ?: '';
 
 try {
     $conn = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);

@@ -6,7 +6,7 @@
 // For production: https://bluefifth.in
 // ============================================================
 
-define('BASE_URL', 'http://localhost/ecommerce-project');
+define('BASE_URL', getenv('BASE_URL') ?: 'http://localhost/ecommerce-project');
 define('SITE_NAME', 'bluefifth');
 define('SITE_URL',   BASE_URL);
 define('ADMIN_EMAIL', 'velonauk@gmail.com');
