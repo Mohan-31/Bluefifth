@@ -410,7 +410,7 @@ if (isset($_POST['ajax_action'])) {
         if (!$code) { echo json_encode(['success'=>false,'message'=>'Enter a coupon code.']); exit; }
         try {
             $conn = getConnection();
-            $stmt = $conn->prepare("SELECT * FROM coupons WHERE code=? AND is_active=1 AND (expiry_date IS NULL OR expiry_date>=CURDATE())");
+            $stmt = $conn->prepare("SELECT * FROM coupons WHERE code=? AND is_active=1 AND (expires_at IS NULL OR expires_at >= CURRENT_TIMESTAMP)");
             $stmt->execute([$code]);
             $coupon = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$coupon) { echo json_encode(['success'=>false,'message'=>'Invalid or expired coupon.']); exit; }
@@ -1865,10 +1865,21 @@ $emailTaxExclusiveSubtotal = $emailSubtotal - $taxAmount;
     .mf-label{font-size:12px;font-weight:600;color:#555;margin-bottom:5px;display:block}
     .mf-input{width:100%;border:1px solid #dde2f0;border-radius:8px;padding:11px 13px;font-size:14px;font-family:'Poppins',sans-serif;outline:none;transition:border-color .2s}
     .mf-input:focus{border-color:#004AAD;box-shadow:0 0 0 3px rgba(0,74,173,.08)}
-    .mf-select{width:100%;border:1px solid #dde2f0;border-radius:8px;padding:11px 13px;font-size:14px;font-family:'Poppins',sans-serif;outline:none;appearance:none;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 12px center}
+    .mf-select{width:100%;border:1px solid #dde2f0;border-radius:8px;padding:11px 13px;font-size:14px;font-family:'Poppins',sans-serif;outline:none;appearance:none;background:#fff url(“data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E”) no-repeat right 12px center}
     .cod-btn{width:100%;padding:14px;background:#1a1a2e;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;margin-top:8px;font-family:'Poppins',sans-serif;transition:background .2s}
     .cod-btn:hover{background:#004AAD}
     .cod-btn:disabled{opacity:.65;cursor:not-allowed}
+    /* â”€â”€â”€ Saved address cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+    .saved-addr-section{margin-bottom:16px}
+    .saved-addr-label{font-size:12px;font-weight:600;color:#555;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+    .addr-cards{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+    .addr-cards::-webkit-scrollbar{display:none}
+    .addr-card{flex-shrink:0;border:2px solid #eee;border-radius:10px;padding:10px 12px;cursor:pointer;transition:all .2s;max-width:180px;background:#fafafa}
+    .addr-card:hover{border-color:#004AAD;background:#f0f4ff}
+    .addr-card.selected{border-color:#004AAD;background:#f0f4ff}
+    .addr-card-name{font-size:13px;font-weight:600;color:#1a1a2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .addr-card-line{font-size:11px;color:#888;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .addr-card-badge{display:inline-block;font-size:10px;font-weight:700;background:#004AAD;color:#fff;padding:1px 6px;border-radius:20px;margin-top:4px}
 
     /* â”€â”€â”€ Error toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     .err-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#dc3545;color:#fff;padding:12px 22px;border-radius:10px;font-size:14px;font-weight:500;z-index:2000;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;max-width:90vw}
@@ -1994,8 +2005,8 @@ $emailTaxExclusiveSubtotal = $emailSubtotal - $taxAmount;
       <!-- Items -->
       <?php foreach ($cartItems as $item):
         $img = !empty($item['primary_image'])
-          ? 'uploads/products/' . htmlspecialchars($item['primary_image'])
-          : 'assets/images/placeholder.png';
+          ? BASE_PATH . $item['primary_image']
+          : BASE_PATH . '/assets/images/placeholder.png';
       ?>
       <div class="item-row">
         <img src="<?= $img ?>" class="item-img" alt="<?= htmlspecialchars($item['product_name'] ?? $item['name'] ?? '') ?>">
@@ -2067,8 +2078,14 @@ $emailTaxExclusiveSubtotal = $emailSubtotal - $taxAmount;
   <div class="modal-box">
     <div class="modal-header">
       <span class="modal-title">Delivery Address</span>
-      <button class="modal-close" onclick="closeCODModal()">Ã—</button>
+      <button class="modal-close" onclick="closeCODModal()">×</button>
     </div>
+    <?php if ($isLoggedIn): ?>
+    <div class="saved-addr-section" id="saved-addr-section" style="display:none">
+      <div class="saved-addr-label"><i class="fas fa-bookmark"></i> Saved Addresses</div>
+      <div class="addr-cards" id="saved-addr-cards"></div>
+    </div>
+    <?php endif; ?>
     <div class="mf-row">
       <div class="mf-group">
         <label class="mf-label">First Name *</label>
@@ -2362,17 +2379,72 @@ async function initiateRazorpayCheckout() {
   } catch(e) { setAllBtnsLoading(false); showError('Network error. Please try again.'); }
 }
 
-/* â”€â”€ COD modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â”€â”€ COD modal + saved addresses â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function openCODModal() {
-  // Pre-fill phone from checkout form
   var phone = document.getElementById('co-phone').value.replace(/\D/g,'');
   if (phone) setVal('cod-phone', phone);
   document.getElementById('cod-modal').classList.add('open');
   document.body.style.overflow = 'hidden';
+  loadSavedAddresses();
 }
 function closeCODModal() {
   document.getElementById('cod-modal').classList.remove('open');
   document.body.style.overflow = '';
+}
+
+function loadSavedAddresses() {
+  var sec = document.getElementById('saved-addr-section');
+  if (!sec) return; // not logged in
+  fetch('checkout.php', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ajax_action: 'get_addresses'})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data) {
+    if (!data.success || !data.addresses || !data.addresses.length) return;
+    var container = document.getElementById('saved-addr-cards');
+    container.innerHTML = '';
+    data.addresses.forEach(function(addr, i) {
+      var card = document.createElement('div');
+      card.className = 'addr-card' + (addr.is_default ? ' selected' : '');
+      card.dataset.idx = i;
+      var badge = addr.is_default ? '<div class=”addr-card-badge”>Default</div>' : '';
+      card.innerHTML =
+        '<div class=”addr-card-name”>' + escHtml(addr.full_name || '') + '</div>' +
+        '<div class=”addr-card-line”>' + escHtml(addr.address_line || '') + '</div>' +
+        '<div class=”addr-card-line”>' + escHtml(addr.city || '') + ', ' + escHtml(addr.pincode || '') + '</div>' +
+        badge;
+      card.addEventListener('click', function() {
+        document.querySelectorAll('.addr-card').forEach(function(c){ c.classList.remove('selected'); });
+        card.classList.add('selected');
+        fillFromSavedAddress(addr);
+      });
+      container.appendChild(card);
+      if (addr.is_default) fillFromSavedAddress(addr);
+    });
+    sec.style.display = 'block';
+  })
+  .catch(function(){});
+}
+
+function fillFromSavedAddress(addr) {
+  var name = addr.full_name || '';
+  var parts = name.trim().split(' ');
+  setVal('cod-fname', parts[0] || '');
+  setVal('cod-lname', parts.slice(1).join(' '));
+  setVal('cod-email', addr.email || '');
+  setVal('cod-phone', addr.phone || '');
+  setVal('cod-address', addr.address_line || '');
+  setVal('cod-apt',     addr.apartment || '');
+  setVal('cod-city',    addr.city || '');
+  setVal('cod-pin',     addr.pincode || '');
+  var ss = document.getElementById('cod-state');
+  if (ss && addr.state) ss.value = addr.state;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/”/g,'&quot;');
 }
 
 async function placeCODOrder() {

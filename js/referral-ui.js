@@ -142,17 +142,17 @@ function setupClaimButton() {
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
-                            alert('Claim successful! Admin has been notified and will process your payment.');
+                            if (window.showToast) showToast('Claim submitted! Admin will process your payment shortly.', 'success');
                             
                             // Reload referral data to update UI
                             loadReferralData();
                         } else {
-                            alert('Failed to claim points: ' + data.message);
+                            if (window.showToast) showToast('Failed to claim points: ' + data.message, 'error');
                         }
                     })
                     .catch(error => {
                         console.error('Error claiming points:', error);
-                        alert('An error occurred while claiming points. Please try again.');
+                        if (window.showToast) showToast('An error occurred while claiming points. Please try again.', 'error');
                     });
             }
         });

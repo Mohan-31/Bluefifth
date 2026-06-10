@@ -35,10 +35,7 @@ $offset = intval($_GET['offset'] ?? $_POST['offset'] ?? 0);
 $page = max(1, intval($_GET['page'] ?? $_POST['page'] ?? 1));
 $action = trim($_GET['action'] ?? $_POST['action'] ?? 'search');
 
-// Validate and sanitize inputs
-$query = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
-$category = htmlspecialchars($category, ENT_QUOTES, 'UTF-8');
-$sortBy = htmlspecialchars($sortBy, ENT_QUOTES, 'UTF-8');
+// Validate and sanitize inputs (DB uses prepared statements; no htmlspecialchars on query terms)
 $limit = min(max($limit, 1), 100); // Limit between 1 and 100
 $offset = max($offset, 0);
 
@@ -185,19 +182,23 @@ function handleSearchSuggestions() {
     
     try {
         $conn = getConnection();
-        
+        $safeLimit = (int)$limit;
+
         // Get product name suggestions
         $stmt = $conn->prepare("
-            SELECT DISTINCT name, id, price,
-                   (SELECT image_url FROM product_images pi WHERE pi.product_id = p.id AND pi.is_primary = TRUE LIMIT 1) as primary_image
+            SELECT name, id, price, featured,
+                   COALESCE(
+                       (SELECT image_url FROM product_images pi WHERE pi.product_id = p.id AND pi.is_primary = TRUE LIMIT 1),
+                       (SELECT image_url FROM product_images pi2 WHERE pi2.product_id = p.id ORDER BY pi2.id ASC LIMIT 1)
+                   ) as primary_image
             FROM products p
-            WHERE p.status = 'active' 
-            AND p.name LIKE ?
+            WHERE p.status = 'active'
+            AND p.name ILIKE ?
             ORDER BY p.featured DESC, p.name ASC
-            LIMIT ?
+            LIMIT $safeLimit
         ");
         $searchTerm = '%' . $query . '%';
-        $stmt->execute([$searchTerm, $limit]);
+        $stmt->execute([$searchTerm]);
         $productSuggestions = $stmt->fetchAll();
         
         foreach ($productSuggestions as $product) {
@@ -213,10 +214,10 @@ function handleSearchSuggestions() {
         
         // Get category suggestions
         $stmt = $conn->prepare("
-            SELECT name, slug 
-            FROM categories 
-            WHERE status = 'active' 
-            AND name LIKE ?
+            SELECT name, slug
+            FROM categories
+            WHERE status = 'active'
+            AND name ILIKE ?
             ORDER BY name ASC
             LIMIT 3
         ");
@@ -276,7 +277,7 @@ function handleQuickSearch() {
             'id' => $product['id'],
             'name' => $product['name'],
             'price' => formatProductPrice($product['price']),
-            'image' => $product['primary_image'] ?? '../assets/images/default-product.jpg',
+            'image' => $product['primary_image'] ?? '/assets/images/default-product.jpg',
             'url' => "product.php?id={$product['id']}",
             'category' => $product['category_name'] ?? '',
             'in_stock' => ($product['stock_quantity'] ?? 0) > 0
@@ -308,7 +309,7 @@ function handlePopularSearches() {
         $stmt = $conn->prepare("
             SELECT search_term, COUNT(*) as search_count
             FROM search_logs 
-            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            WHERE created_at >= NOW() - INTERVAL '30 days'
             GROUP BY search_term
             ORDER BY search_count DESC
             LIMIT 10
@@ -520,14 +521,14 @@ function enhanceProductData($product) {
         'category_id' => intval($product['category_id'] ?? 0),
         'category_name' => $product['category_name'] ?? '',
         'category_slug' => $product['category_slug'] ?? '',
-        'primary_image' => $product['primary_image'] ?? '../assets/images/default-product.jpg',
+        'primary_image' => $product['primary_image'] ?? '/assets/images/default-product.jpg',
         'stock_quantity' => intval($product['stock_quantity'] ?? 0),
         'stock_status' => $product['stock_status'] ?? 'in_stock',
         'featured' => boolval($product['featured'] ?? false),
         'created_at' => $product['created_at'] ?? '',
         'updated_at' => $product['updated_at'] ?? '',
         'url' => "product.php?id={$product['id']}",
-        'add_to_cart_url' => "../api/cart.php",
+        'add_to_cart_url' => "api/cart.php",
         'in_stock' => ($product['stock_quantity'] ?? 0) > 0,
         'sizes' => []
     ];
@@ -579,10 +580,10 @@ function getSearchSuggestions($query) {
         
         // Get related product names
         $stmt = $conn->prepare("
-            SELECT DISTINCT name 
-            FROM products 
-            WHERE status = 'active' 
-            AND name LIKE ? 
+            SELECT name, featured
+            FROM products
+            WHERE status = 'active'
+            AND name ILIKE ?
             AND name != ?
             ORDER BY featured DESC, name ASC
             LIMIT 5
@@ -617,7 +618,7 @@ function getRelatedCategories($query) {
             JOIN products p ON c.id = p.category_id
             WHERE c.status = 'active' 
             AND p.status = 'active'
-            AND (p.name LIKE ? OR c.name LIKE ?)
+            AND (p.name ILIKE ? OR c.name ILIKE ?)
             GROUP BY c.id, c.name, c.slug
             ORDER BY product_count DESC, c.name ASC
             LIMIT 5
@@ -657,7 +658,7 @@ function getPopularSearchTerms($currentQuery, $limit = 5) {
             FROM search_logs 
             WHERE search_term LIKE ? 
             AND search_term != ?
-            AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            AND created_at >= NOW() - INTERVAL '30 days'
             GROUP BY search_term
             ORDER BY count DESC
             LIMIT ?
@@ -795,17 +796,17 @@ try {
     $conn = getConnection();
     $conn->exec("
         CREATE TABLE IF NOT EXISTS search_logs (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id INT NULL,
+            id          SERIAL      PRIMARY KEY,
+            user_id     INTEGER     NULL,
             search_term VARCHAR(255) NOT NULL,
-            result_count INT DEFAULT 0,
-            ip_address VARCHAR(45) NULL,
-            user_agent TEXT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_search_term (search_term),
-            INDEX idx_created_at (created_at),
-            INDEX idx_user_id (user_id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            result_count INTEGER    DEFAULT 0,
+            ip_address  VARCHAR(45) NULL,
+            user_agent  TEXT        NULL,
+            created_at  TIMESTAMP   DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_search_logs_term       ON search_logs (search_term);
+        CREATE INDEX IF NOT EXISTS idx_search_logs_created_at ON search_logs (created_at);
+        CREATE INDEX IF NOT EXISTS idx_search_logs_user_id    ON search_logs (user_id)
     ");
 } catch (Exception $e) {
     // Continue without search logging if table creation fails

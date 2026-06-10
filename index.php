@@ -42,7 +42,7 @@ if ($referralCode && isValidReferralCode($referralCode)) {
         $visitorIp = getClientIP();
         
         // Check if this IP has visited via this referral today
-        $stmt = $conn->prepare("SELECT id FROM referral_visits WHERE referral_id = ? AND visitor_ip = ? AND DATE(visited_at) = CURDATE()");
+        $stmt = $conn->prepare("SELECT id FROM referral_visits WHERE referral_id = ? AND visitor_ip = ? AND DATE(visited_at) = CURRENT_DATE");
         $stmt->execute([$referralId, $visitorIp]);
         
         if ($stmt->rowCount() == 0) {
@@ -70,7 +70,7 @@ $siteName = getSystemSetting('site_name', 'Bluefifth');
 $siteDescription = getSystemSetting('site_description', 'Premium clothing with sustainable fashion');
 
 // Get user's cart summary if logged in
-$cartSummary = $isLoggedIn ? getCartSummary($currentUser['id']) : ['item_count' => 0, 'total_amount' => 0];
+$cartSummary = $isLoggedIn ? getCartSummary($currentUser['id']) : getSessionCartSummary();
 
 // Get wallet balance if logged in
 $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' => 0, 'pending_points' => 0];
@@ -78,9 +78,16 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
 <!doctype html>
 <html lang="en">
 <head>
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="dns-prefetch" href="https://kit.fontawesome.com">
+    <link rel="dns-prefetch" href="https://code.jquery.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="assets/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://kit.fontawesome.com/4358befd66.js" crossorigin="anonymous"></script>
+    <script src="https://kit.fontawesome.com/4358befd66.js" crossorigin="anonymous" async></script>
     <!-- Required meta tags -->
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -415,42 +422,38 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
         /* Default (mobile first) */
         .banner-bg {
             background-image: url('<?= BASE_PATH ?>/assets/images/banner-head-mob.png');
-            width: 100vw;
-            height: auto;
+            width: 100%;
+            margin-top: 110px;
+            height: calc(78vh - 110px);
+            min-height: 280px;
             background-size: cover;
+            background-position: center top;
         }
-        .bg-align{
-            height: 490px;
-            width: 100vw;
+        .bg-align {
+            height: calc(78vh - 110px);
+            min-height: 280px;
+            width: 100%;
         }
-        
+
         /* Tablet (768px–991px) */
         @media (min-width: 768px) and (max-width: 991px) {
             .banner-bg {
                 background-image: url('<?= BASE_PATH ?>/assets/images/banner-head2.png');
-                background-repeat: no-repeat;
                 background-position: center;
-                background-size: cover;
-                height: 80vh;
+                margin-top: 116px;
+                height: calc(78vh - 116px);
             }
-            .bg-align{
-                height: 80vh;
-                width: 100vw;
-             }
+            .bg-align { height: calc(78vh - 116px); }
         }
         /* Desktop (≥992px) */
         @media (min-width: 992px) {
             .banner-bg {
                 background-image: url('<?= BASE_PATH ?>/assets/images/banner-head2.png');
-                background-repeat: no-repeat;
                 background-position: center;
-                background-size: cover;
-                height: 95vh;
+                margin-top: 160px;
+                height: calc(78vh - 160px);
             }
-            .bg-align{
-                height: 95vh;
-                width: 100vw;
-             }
+            .bg-align { height: calc(78vh - 160px); }
         }
         
          .title-1{
@@ -579,15 +582,15 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
 <?php endif; ?>
 
 <!-- Hero Banner -->
-<div class="container-fluid banner-bg nav-align" >
+<div class="container-fluid banner-bg" id="hero-banner">
     <div class="row">
-        <div class=" bg-align d-flex justify-content-center align-items-end align-items-md-center  col-12 text-center" >
-            <div class="mb-5">
-                <div class="">
-                    <h1 class="banner-h1 d-none d-lg-block text-light " style="font-size: 54px;">COMFORT WEAR COLLECTION OUT NOW</h1>
-                    <h1 class="banner-h1 d-lg-none d-block text-light">COMFORT WEAR COLLECTION OUT NOW</h1>
+        <div class="bg-align d-flex justify-content-center align-items-center col-12 text-center">
+            <div>
+                <div>
+                    <h1 class="banner-h1 d-none d-lg-block text-light" style="font-size: 54px; text-align:center;">COMFORT WEAR COLLECTION OUT NOW</h1>
+                    <h1 class="banner-h1 d-lg-none d-block text-light" style="text-align:center;">COMFORT WEAR COLLECTION OUT NOW</h1>
                 </div>
-                <div class="mt-4">
+                <div class="mt-4 text-center">
                     <a href="shop/category.php"><button class="btn-banner text-light" style="background-color:#343A40;">SHOP NOW</button></a>
                 </div>
             </div>
@@ -614,33 +617,21 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
                     <div class="product-card" data-product-id="<?= $product['id'] ?>">
                         <a href="shop/product.php?id=<?= $product['id'] ?>" class="text-decoration-none">
                             <div class="image-container2 rounded-0">
-                                <img src="<?= htmlspecialchars($product['primary_image'] ?: '/assets/images/default-product.jpg') ?>" 
-                                     alt="<?= htmlspecialchars($product['name']) ?>" class="default-img rounded-0">
-                                <img src="<?= htmlspecialchars($product['primary_image'] ?: '/assets/images/default-product.jpg') ?>" 
-                                     alt="<?= htmlspecialchars($product['name']) ?>" class="hover-img rounded-0">
+                                <img src="<?= htmlspecialchars(BASE_PATH . ($product['primary_image'] ?: '/assets/images/default-product.jpg')) ?>"
+                                     alt="<?= htmlspecialchars($product['name']) ?>" class="default-img rounded-0" loading="lazy">
+                                <img src="<?= htmlspecialchars(BASE_PATH . ($product['primary_image'] ?: '/assets/images/default-product.jpg')) ?>"
+                                     alt="<?= htmlspecialchars($product['name']) ?>" class="hover-img rounded-0" loading="lazy">
                             </div>
                             <h5 class="product-title text-left pl-4 text-dark"><?= htmlspecialchars($product['name']) ?></h5>
                             <p class="product-price text-left pl-4 text-dark">₹<?= number_format($product['price'], 2) ?></p>
-                            
-                            <?php 
-                            $sizes = $product['sizes'] ? json_decode($product['sizes'], true) : [];
+
+                            <?php
+                            $sizes = normalizeSizes($product['sizes'] ?? '');
                             $defaultSize = !empty($sizes) ? $sizes[0] : 'M';
                             ?>
                             
-                            <span class="size-label text-left pl-4 text-dark d-none">Size: <strong class="selected-size"><?= $defaultSize ?></strong></span>
-                            
-                            <?php if (!empty($sizes)): ?>
-                                <div class="btn-group btn-group-toggle size-options pl-4" data-toggle="buttons">
-                                    <?php foreach ($sizes as $index => $size): ?>
-                                        <label class="btn btn-outline-dark grid-size-btn <?= $index === 0 ? 'active' : '' ?>">
-                                            <input type="radio" name="size_<?= $product['id'] ?>" value="<?= $size ?>" <?= $index === 0 ? 'checked' : '' ?>> <?= $size ?>
-                                        </label>
-                                    <?php endforeach; ?>
-                                </div>
-                            <?php endif; ?>
-                            
-                            <button class="add-to-cart " onclick="addToCartFromSlider(event, <?= $product['id'] ?>)">
-                                <i class="fas fa-shopping-cart"></i> Add To Cart
+                            <button type="button" class="add-to-cart">
+                                View Product
                             </button>
                         </a>
                         </div>
@@ -806,16 +797,16 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
                     <div class="product-card" data-product-id="<?= $product['id'] ?>">
                         <a href="shop/product.php?id=<?= $product['id'] ?>" class="text-decoration-none">
                             <div class="image-container2 rounded-0">
-                                <img src="<?= htmlspecialchars($product['primary_image'] ?: '/assets/images/default-product.jpg') ?>" 
+                                <img src="<?= htmlspecialchars(BASE_PATH . ($product['primary_image'] ?: '/assets/images/default-product.jpg')) ?>"
                                      alt="<?= htmlspecialchars($product['name']) ?>" class="default-img">
-                                <img src="<?= htmlspecialchars($product['primary_image'] ?: '/assets/images/default-product.jpg') ?>" 
+                                <img src="<?= htmlspecialchars(BASE_PATH . ($product['primary_image'] ?: '/assets/images/default-product.jpg')) ?>"
                                      alt="<?= htmlspecialchars($product['name']) ?>" class="hover-img">
                             </div>
                             <h5 class="product-title text-dark text-left pl-4"><?= htmlspecialchars($product['name']) ?></h5>
                             <p class="product-price text-dark text-left pl-4">₹<?= number_format($product['price'], 2) ?></p>
-                            
-                            <?php 
-                            $sizes = $product['sizes'] ? json_decode($product['sizes'], true) : [];
+
+                            <?php
+                            $sizes = normalizeSizes($product['sizes'] ?? '');
                             $defaultSize = !empty($sizes) ? $sizes[0] : 'M';
                             ?>
                             
@@ -831,8 +822,8 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
                                 </div>
                             <?php endif; ?>
                             
-                            <button class="add-to-cart" onclick="addToCartFromSlider(event, <?= $product['id'] ?>)">
-                                <i class="fas fa-shopping-cart"></i> Add To Cart
+                            <button type="button" class="add-to-cart">
+                                View Product
                             </button>
                         </a>
                     </div>
@@ -1291,6 +1282,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
 
 <!-- APPLICATION SCRIPT -->
 <script>
+const BASE_PATH = '<?= BASE_PATH ?>';
 let currentUser = <?= $isLoggedIn ? 'true' : 'false' ?>;
 let isLoggedIn = <?= $isLoggedIn ? 'true' : 'false' ?>;
 
@@ -2337,62 +2329,6 @@ async function addToCartFromSlider(event, productId) {
     }
 }
 
-// Search functionality
-function toggleSearch() {
-    $('#searchModal').modal('show');
-    document.getElementById('searchInput').focus();
-}
-
-async function performSearch() {
-    const searchTerm = document.getElementById('searchInput').value.trim();
-    
-    if (searchTerm.length < 2) {
-        return;
-    }
-
-    try {
-        const response = await fetch(`shop/api/search.php?q=${encodeURIComponent(searchTerm)}`);
-        const data = await response.json();
-
-        if (data.success) {
-            displaySearchResults(data.products);
-        } else {
-            document.getElementById('searchResults').innerHTML = '<p class="text-muted">No products found.</p>';
-        }
-    } catch (error) {
-        console.error('Search error:', error);
-        document.getElementById('searchResults').innerHTML = '<p class="text-danger">Search failed. Please try again.</p>';
-    }
-}
-
-function displaySearchResults(products) {
-    const resultsContainer = document.getElementById('searchResults');
-    
-    if (products.length === 0) {
-        resultsContainer.innerHTML = '<p class="text-muted">No products found.</p>';
-        return;
-    }
-
-    let html = '<div class="row">';
-    products.forEach(product => {
-        html += `
-            <div class="col-md-4 mb-3">
-                <div class="card">
-                    <img src="${product.primary_image || '/assets/images/default-product.jpg'}" 
-                         class="card-img-top" style="height: 200px; object-fit: cover;">
-                    <div class="card-body">
-                        <h6 class="card-title">${product.name}</h6>
-                        <p class="card-text">₹${parseFloat(product.price).toFixed(2)}</p>
-                        <a href="shop/product.php?id=${product.id}" class="btn btn-primary btn-sm">View Product</a>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    html += '</div>';
-    
-    resultsContainer.innerHTML = html;
-}
 
 
 
@@ -2460,6 +2396,25 @@ document.addEventListener('keydown', function(event) {
         closeAllPopups();
     }
 });
+
+// Hero: flush-fit below the navbar; on mobile show a peek of the next section
+(function () {
+    function fitHero() {
+        var navbar = document.getElementById('main-navbar');
+        var hero   = document.getElementById('hero-banner');
+        if (!navbar || !hero) return;
+        var offset = 48 + navbar.offsetHeight;
+        // On mobile show ~70px of the section below so user knows to scroll
+        var peek = window.innerWidth < 768 ? 70 : 0;
+        var h = 'calc(100vh - ' + (offset + peek) + 'px)';
+        hero.style.marginTop = offset + 'px';
+        hero.style.height    = h;
+        var inner = hero.querySelector('.bg-align');
+        if (inner) inner.style.height = h;
+    }
+    document.addEventListener('DOMContentLoaded', fitHero);
+    window.addEventListener('resize', fitHero);
+}());
 
 // Initialize page on DOM content loaded
 document.addEventListener('DOMContentLoaded', function() {

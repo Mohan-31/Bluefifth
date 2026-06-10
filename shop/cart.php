@@ -713,8 +713,16 @@ $finalTotal = $totalAmount + $shippingCost;
                     <?php foreach ($cartItems as $item): ?>
                         <div class="cart-card" data-cart-id="<?= $isLoggedIn ? $item['id'] : $item['cart_key'] ?>" data-product-id="<?= $item['product_id'] ?>">
                             <div class="cart-card-left">
-                                <img src="<?= htmlspecialchars($item['product_image'] ?: '../assets/images/default-product.jpg') ?>" 
-                                     alt="<?= htmlspecialchars($item['product_name']) ?>" class="cart-card-img">
+                                <?php if (!empty($item['product_image'])): ?>
+                                <img src="<?= htmlspecialchars(BASE_PATH . $item['product_image']) ?>"
+                                     alt="<?= htmlspecialchars($item['product_name']) ?>"
+                                     class="cart-card-img"
+                                     onerror="this.parentNode.innerHTML='<div class=&quot;cart-card-img&quot; style=&quot;background:#f0f0f0;display:flex;align-items:center;justify-content:center&quot;><i class=&quot;fa fa-image&quot; style=&quot;color:#ccc;font-size:2rem&quot;></i></div>'">
+                                <?php else: ?>
+                                <div class="cart-card-img" style="background:#f0f0f0;display:flex;align-items:center;justify-content:center;">
+                                    <i class="fa fa-image" style="color:#ccc;font-size:2rem;"></i>
+                                </div>
+                                <?php endif; ?>
                             </div>
                             <div class="cart-card-body">
                                 <h5 class="cart-card-title">
@@ -773,11 +781,8 @@ $finalTotal = $totalAmount + $shippingCost;
                         
                         <p class="note">Taxes included. Discounts calculated at checkout.</p>
                         
-                        <?php if ($isLoggedIn): ?>
-                            <a href="../checkout.php"><button class="checkout-btn text-decoration-none w-100">Check out</button></a>
-                        <?php else: ?>
-                            <button class="checkout-btn w-100" onclick="proceedToCheckout()">Check out</button>
-                        <?php endif; ?>
+                        <button class="checkout-btn w-100" disabled style="background:#aaa;cursor:not-allowed;">Check out — Coming Soon</button>
+                        <p class="note text-center mt-2" style="color:#999;font-size:12px;">Checkout will be available soon. Your cart is saved!</p>
                         
                         <!-- Clear Cart Button -->
                         <button class="btn btn-outline-secondary btn-sm mt-3 w-100" onclick="clearCart()">
@@ -1211,15 +1216,17 @@ $finalTotal = $totalAmount + $shippingCost;
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    // Declare in outer scope so logoutUser() and other non-IIFE functions can access it
+    var currentUser = <?= $isLoggedIn ? 'true' : 'false' ?>;
+
     // SIMPLIFIED AUTH FOR NON-INDEX PAGES
         (function() {
             'use strict';
-            
+
             // Configuration
             const GOOGLE_CLIENT_ID = "340757900430-i8nl6l45ndveq9jmbvbah7ugquauj803.apps.googleusercontent.com";
             const AUTH_ENDPOINT = "../auth/google-callback.php";  // FIXED PATH
-            
-            let currentUser = <?= $isLoggedIn ? 'true' : 'false' ?>;
+
             let googleInitialized = false;
             
             // Initialize Google Sign-In API (WITHOUT silent auth)
@@ -1772,65 +1779,6 @@ function shareLinkViaWebShare() {
         });
     }
 
-    // Search functionality - EXACT COPY FROM INDEX.PHP
-    function toggleSearch() {
-        $('#searchModal').modal('show');
-        document.getElementById('searchInput').focus();
-    }
-
-    async function performSearch() {
-        const searchTerm = document.getElementById('searchInput').value.trim();
-        
-        if (searchTerm.length < 2) {
-            return;
-        }
-
-        try {
-            const basePath = '<?= $basePath ?>';
-            const response = await fetch(`${basePath}shop/api/search.php?q=${encodeURIComponent(searchTerm)}`);
-            const data = await response.json();
-
-            if (data.success) {
-                displaySearchResults(data.products);
-            } else {
-                document.getElementById('searchResults').innerHTML = '<p class="text-muted">No products found.</p>';
-            }
-        } catch (error) {
-            console.error('Search error:', error);
-            document.getElementById('searchResults').innerHTML = '<p class="text-danger">Search failed. Please try again.</p>';
-        }
-    }
-
-    function displaySearchResults(products) {
-        const resultsContainer = document.getElementById('searchResults');
-        
-        if (products.length === 0) {
-            resultsContainer.innerHTML = '<p class="text-muted">No products found.</p>';
-            return;
-        }
-
-        const basePath = '<?= $basePath ?>';
-        let html = '<div class="row">';
-        products.forEach(product => {
-            html += `
-                <div class="col-md-4 mb-3">
-                    <div class="card">
-                        <img src="${product.primary_image || basePath + 'assets/images/default-product.jpg'}" 
-                            class="card-img-top" style="height: 200px; object-fit: cover;">
-                        <div class="card-body">
-                            <h6 class="card-title">${product.name}</h6>
-                            <p class="card-text">₹${parseFloat(product.price).toFixed(2)}</p>
-                            <a href="${basePath}shop/product.php?id=${product.id}" class="btn btn-primary btn-sm">View Product</a>
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-        html += '</div>';
-        
-        resultsContainer.innerHTML = html;
-    }
-
     // Utility functions - EXACT COPY FROM INDEX.PHP
     function showNotification(message, type) {
         // Create notification element
@@ -2074,73 +2022,7 @@ function shareLinkViaWebShare() {
         }
 
         function proceedToCheckout() {
-            // DIRECT CHECKOUT - NO LOGIN POPUP
-            window.location.href = '../checkout.php';
-        }
-
-        // Search functionality
-        function toggleSearch() {
-            $('#searchModal').modal('show');
-            setTimeout(() => document.getElementById('searchInput').focus(), 500);
-        }
-
-        function handleSearchKeypress(event) {
-            if (event.key === 'Enter') {
-                performSearch();
-            }
-        }
-
-        async function performSearch() {
-            const searchTerm = document.getElementById('searchInput').value.trim();
-            
-            if (searchTerm.length < 2) {
-                showNotification('Please enter at least 2 characters', 'warning');
-                return;
-            }
-
-            try {
-                const response = await fetch(`api/search.php?q=${encodeURIComponent(searchTerm)}`);
-                const data = await response.json();
-
-                if (data.success && data.products) {
-                    displaySearchResults(data.products);
-                } else {
-                    document.getElementById('searchResults').innerHTML = '<p class="text-muted">No products found.</p>';
-                }
-            } catch (error) {
-                console.error('Search error:', error);
-                document.getElementById('searchResults').innerHTML = '<p class="text-danger">Search failed. Please try again.</p>';
-            }
-        }
-
-        function displaySearchResults(products) {
-            const resultsContainer = document.getElementById('searchResults');
-            
-            if (products.length === 0) {
-                resultsContainer.innerHTML = '<p class="text-muted">No products found.</p>';
-                return;
-            }
-
-            let html = '<div class="row">';
-            products.forEach(product => {
-                html += `
-                    <div class="col-md-4 mb-3">
-                        <div class="card">
-                            <img src="${product.primary_image || '../assets/images/default-product.jpg'}" 
-                                 class="card-img-top" style="height: 200px; object-fit: cover;" 
-                                 alt="${product.name}">
-                            <div class="card-body">
-                                <h6 class="card-title">${product.name}</h6>
-                                <p class="card-text">₹${parseFloat(product.price).toFixed(2)}</p>
-                                <a href="product.php?id=${product.id}" class="btn btn-primary btn-sm">View Product</a>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-            html += '</div>';
-            
-            resultsContainer.innerHTML = html;
+            // Checkout temporarily disabled
         }
 
         // Newsletter subscription
@@ -2297,10 +2179,10 @@ function shareLinkViaWebShare() {
 
             // Keyboard shortcuts
             document.addEventListener('keydown', function(e) {
-                // Ctrl+Enter or Cmd+Enter to checkout
+                // Ctrl+Enter or Cmd+Enter to checkout (disabled)
                 if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                     <?php if ($isLoggedIn && !empty($cartItems)): ?>
-                        window.location.href = '../checkout.php';
+                        // checkout disabled
                     <?php elseif (!empty($cartItems)): ?>
                         proceedToCheckout();
                     <?php endif; ?>

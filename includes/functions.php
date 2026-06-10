@@ -10,6 +10,21 @@ require_once __DIR__ . '/config.php';
 // ============================================================================
 
 /**
+ * Normalize sizes from DB (JSONB) to a flat array of size strings.
+ * Handles both [{size:'S',stock:10},...] and ['S','M',...] formats.
+ */
+function normalizeSizes($sizes) {
+    if (empty($sizes)) return [];
+    if (is_string($sizes)) $sizes = json_decode($sizes, true);
+    if (empty($sizes) || !is_array($sizes)) return [];
+    $first = reset($sizes);
+    if (is_array($first) && isset($first['size'])) {
+        return array_column($sizes, 'size');
+    }
+    return $sizes;
+}
+
+/**
  * Sanitize input data
  * @param mixed $data Input data to sanitize
  * @return mixed Sanitized data
@@ -2114,7 +2129,7 @@ function cleanOldVisitorTracking($daysOld = 30) {
     
     try {
         $conn = getConnection();
-        $stmt = $conn->prepare("DELETE FROM referral_visits WHERE visited_at < DATE_SUB(NOW(), INTERVAL ? DAY)");
+        $stmt = $conn->prepare("DELETE FROM referral_visits WHERE visited_at < NOW() - (? * INTERVAL '1 day')");
         $stmt->execute([$daysOld]);
         return $stmt->rowCount();
     } catch (Exception $e) {
@@ -2379,7 +2394,7 @@ function getNewArrivals($limit = 8) {
             FROM products p
             JOIN categories c ON p.category_id = c.id
             WHERE p.status = 'active'
-            AND p.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            AND p.created_at >= NOW() - INTERVAL '30 days'
             ORDER BY p.created_at DESC
             LIMIT {$limitValue}
         ");
@@ -3216,17 +3231,18 @@ function searchProducts($searchTerm, $limit = 20, $offset = 0) {
         $offsetValue = intval($offset);
         
         $stmt = $conn->prepare("
-            SELECT 
+            SELECT
                 p.*,
                 c.name as category_name,
+                c.slug as category_slug,
                 (SELECT image_url FROM product_images pi WHERE pi.product_id = p.id AND pi.is_primary = TRUE LIMIT 1) as primary_image
             FROM products p
             JOIN categories c ON p.category_id = c.id
-            WHERE p.status = 'active' 
+            WHERE p.status = 'active'
             AND (
-                p.name LIKE ? 
-                OR p.description LIKE ? 
-                OR c.name LIKE ?
+                p.name ILIKE ?
+                OR p.description ILIKE ?
+                OR c.name ILIKE ?
             )
             ORDER BY p.featured DESC, p.name ASC
             LIMIT {$limitValue} OFFSET {$offsetValue}
@@ -3614,7 +3630,7 @@ function getAllCategories($status = 'active') {
             $params[] = $status;
         }
         
-        $sql .= " GROUP BY c.id ORDER BY c.sort_order ASC, c.name ASC";
+        $sql .= " GROUP BY c.id HAVING COUNT(p.id) > 0 ORDER BY c.sort_order ASC, c.name ASC";
         
         $stmt = $conn->prepare($sql);
         $stmt->execute($params);
@@ -3987,7 +4003,10 @@ function getCartItems($userId) {
                 p.price as product_price,
                 p.stock_quantity,
                 p.status as product_status,
-                (SELECT image_url FROM product_images pi WHERE pi.product_id = p.id AND pi.is_primary = TRUE LIMIT 1) as product_image,
+                COALESCE(
+                    (SELECT image_url FROM product_images pi WHERE pi.product_id = p.id AND pi.is_primary = TRUE LIMIT 1),
+                    (SELECT image_url FROM product_images pi2 WHERE pi2.product_id = p.id ORDER BY pi2.id ASC LIMIT 1)
+                ) as product_image,
                 (c.quantity * p.price) as total_price
             FROM cart c
             JOIN products p ON c.product_id = p.id
@@ -4705,7 +4724,7 @@ try {
     $stmt = $conn->query("
         SELECT COUNT(*) as recent_orders
         FROM orders 
-        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+        WHERE created_at >= NOW() - INTERVAL '7 days'
     ");
     $recentStats = $stmt->fetch();
     $stats['recent_orders'] = $recentStats['recent_orders'];
@@ -5394,12 +5413,12 @@ function setSetting($key, $value, $type = 'string') {
         }
         
         $stmt = $conn->prepare("
-            INSERT INTO settings (setting_key, setting_value, setting_type, updated_at) 
+            INSERT INTO settings (setting_key, setting_value, setting_type, updated_at)
             VALUES (?, ?, ?, NOW())
-            ON DUPLICATE KEY UPDATE 
-            setting_value = VALUES(setting_value),
-            setting_type = VALUES(setting_type),
-            updated_at = NOW()
+            ON CONFLICT (setting_key) DO UPDATE SET
+            setting_value = EXCLUDED.setting_value,
+            setting_type  = EXCLUDED.setting_type,
+            updated_at    = NOW()
         ");
         
         $result = $stmt->execute([$key, $value, $type]);
@@ -5820,19 +5839,19 @@ function getComprehensiveAnalytics() {
                 DATE(created_at) as date,
                 COUNT(*) as daily_signups
             FROM users 
-            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            WHERE created_at >= NOW() - INTERVAL '30 days'
             GROUP BY DATE(created_at)
             ORDER BY date DESC
         ");
         $dailySignups = $stmt->fetchAll();
-        
+
         $stmt = $conn->query("
-            SELECT 
+            SELECT
                 DATE(created_at) as date,
                 COUNT(*) as daily_orders,
                 SUM(final_amount) as daily_revenue
-            FROM orders 
-            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            FROM orders
+            WHERE created_at >= NOW() - INTERVAL '30 days'
             AND payment_status = 'paid'
             GROUP BY DATE(created_at)
             ORDER BY date DESC
@@ -5869,10 +5888,10 @@ function getUserEngagementMetrics() {
         
         $stmt = $conn->query("
             SELECT 
-                COUNT(CASE WHEN last_login >= DATE_SUB(NOW(), INTERVAL 1 DAY) THEN 1 END) as daily_active,
-                COUNT(CASE WHEN last_login >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 END) as weekly_active,
-                COUNT(CASE WHEN last_login >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 END) as monthly_active,
-                COUNT(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 END) as new_users_30d,
+                COUNT(CASE WHEN last_login >= NOW() - INTERVAL '1 day'  THEN 1 END) as daily_active,
+                COUNT(CASE WHEN last_login >= NOW() - INTERVAL '7 days' THEN 1 END) as weekly_active,
+                COUNT(CASE WHEN last_login >= NOW() - INTERVAL '30 days' THEN 1 END) as monthly_active,
+                COUNT(CASE WHEN created_at >= NOW() - INTERVAL '30 days' THEN 1 END) as new_users_30d,
                 COUNT(*) as total_users
             FROM users
         ");
@@ -5915,14 +5934,14 @@ function performSystemMaintenance() {
         
         // Clean old email notifications
         $conn = getConnection();
-        $stmt = $conn->prepare("DELETE FROM email_notifications WHERE sent_at < DATE_SUB(NOW(), INTERVAL 90 DAY)");
+        $stmt = $conn->prepare("DELETE FROM email_notifications WHERE sent_at < NOW() - INTERVAL '90 days'");
         $stmt->execute();
         $cleanedEmails = $stmt->rowCount();
         $results['details']['email_cleanup'] = "Cleaned {$cleanedEmails} old email records";
         $results['tasks_completed']++;
-        
+
         // Clean old activity logs
-        $stmt = $conn->prepare("DELETE FROM activity_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL 60 DAY)");
+        $stmt = $conn->prepare("DELETE FROM activity_logs WHERE created_at < NOW() - INTERVAL '60 days'");
         $stmt->execute();
         $cleanedActivity = $stmt->rowCount();
         $results['details']['activity_cleanup'] = "Cleaned {$cleanedActivity} old activity records";
@@ -5932,7 +5951,7 @@ function performSystemMaintenance() {
         $tables = ['users', 'wallet', 'referrals', 'referral_purchases', 'products', 'orders', 'order_items'];
         foreach ($tables as $table) {
             try {
-                $stmt = $conn->query("OPTIMIZE TABLE {$table}");
+                $stmt = $conn->query("VACUUM ANALYZE {$table}");
                 $results['details']["optimize_{$table}"] = "Table {$table} optimized";
                 $results['tasks_completed']++;
             } catch (Exception $e) {
@@ -6480,7 +6499,7 @@ function initializeSystem() {
             'cart', 'claims', 'email_notifications'
         ];
         
-        $stmt = $conn->query("SHOW TABLES");
+        $stmt = $conn->query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'");
         $existingTables = $stmt->fetchAll(PDO::FETCH_COLUMN);
         
         $missingTables = array_diff($requiredTables, $existingTables);
@@ -7889,7 +7908,8 @@ function getSessionCartItems() {
                         $stmt = $conn->prepare("
                             SELECT image_url
                             FROM product_images
-                            WHERE product_id = ? AND is_primary = 1
+                            WHERE product_id = ?
+                            ORDER BY is_primary DESC, id ASC
                             LIMIT 1
                         ");
                         $stmt->execute([$item['product_id']]);
@@ -7901,10 +7921,7 @@ function getSessionCartItems() {
                         error_log("Error loading product image: " . $e->getMessage());
                     }
                 }
-
-                if (empty($primaryImage)) {
-                    $primaryImage = BASE_PATH . '/assets/images/default-product.jpg';
-                }
+                // Leave $primaryImage null if no image found — cart.php shows grey placeholder
                 
                 $cartItems[] = [
                     'cart_key' => $cartKey,

@@ -148,12 +148,12 @@ function setupApplyPointsButton() {
                     
                     applyButton.parentNode.appendChild(resetButton);
                 } else {
-                    alert('Failed to apply points: ' + data.message);
+                    if (window.showToast) showToast('Failed to apply points: ' + data.message, 'error');
                 }
             })
             .catch(error => {
                 console.error('Error applying points:', error);
-                alert('An error occurred while applying points. Please try again.');
+                if (window.showToast) showToast('An error occurred while applying points. Please try again.', 'error');
             });
         });
     }

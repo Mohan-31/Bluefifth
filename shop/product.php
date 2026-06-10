@@ -48,17 +48,21 @@ $relatedProducts = getRelatedProducts($productId, 4);
 $categories = getAllCategories();
 
 // Get user's cart summary if logged in
-$cartSummary = $isLoggedIn ? getCartSummary($currentUser['id']) : ['item_count' => 0];
+$cartSummary = $isLoggedIn ? getCartSummary($currentUser['id']) : getSessionCartSummary();
 
 // Get wallet balance if logged in
 $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' => 0, 'pending_points' => 0];
 
-// Prepare product images
+// Prepare product images — prepend BASE_PATH so URLs work on localhost and production
 $productImages = $product['images'] ?? [];
-$primaryImage = !empty($productImages) ? $productImages[0]['image_url'] : '../assets/images/default-product.jpg';
+foreach ($productImages as &$img) {
+    $img['image_url'] = BASE_PATH . $img['image_url'];
+}
+unset($img);
+$primaryImage = !empty($productImages) ? $productImages[0]['image_url'] : BASE_PATH . '/assets/images/default-product.jpg';
 
 // Prepare sizes
-$availableSizes = $product['sizes'] ?? [];
+$availableSizes = normalizeSizes($product['sizes'] ?? '');
 
 // Get product rating and reviews
 $productRating = getProductRating($productId);
@@ -67,11 +71,17 @@ $productReviews = getProductReviews($productId);
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="dns-prefetch" href="https://kit.fontawesome.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="../assets/css/style.css">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://kit.fontawesome.com/4358befd66.js" crossorigin="anonymous"></script>
+    <script src="https://kit.fontawesome.com/4358befd66.js" crossorigin="anonymous" async></script>
     <title><?= htmlspecialchars($product['name']) ?> - Bluefifth</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.12.1/font/bootstrap-icons.min.css">
@@ -87,7 +97,6 @@ $productReviews = getProductReviews($productId);
     <meta property="product:price:currency" content="INR">
     
     <style>
-        @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600;700&display=swap");
         body {
             font-family: "Poppins", sans-serif;
             color: #333;
@@ -169,18 +178,63 @@ $productReviews = getProductReviews($productId);
             right: 0;
         }
         
-        .product-title-detail {
-            font-size: 2.5rem;
-            font-weight: 400;
-            margin-bottom: 10px;
-            color: #171717;
+        /* ── Product info column ── */
+        .pd-name {
+            font-size: 1.85rem;
+            font-weight: 500;
+            color: #111;
+            line-height: 1.2;
+            letter-spacing: -0.2px;
+            margin: 0 0 10px;
         }
-        
-        .product-price-detail {
-            font-size: 1.5rem;
-            margin-bottom: 5px;
-            color: #333;
+        @media (min-width: 992px) {
+            .pd-name { font-size: 2.2rem; }
+        }
+        .pd-description {
+            font-size: 0.9rem;
+            line-height: 1.75;
+            color: #555;
+            margin: 0 0 18px;
+        }
+        .pd-price-block {
+            display: block;
+            font-size: 1.9rem;
+            font-weight: 700;
+            color: #111;
+            letter-spacing: -0.5px;
+            line-height: 1;
+            margin: 0 0 4px;
+            font-family: "Poppins", sans-serif;
+        }
+        .pd-tax {
+            font-size: 0.78rem;
+            color: #999;
+            margin: 0 0 18px;
+            display: block;
+        }
+        .pd-meta-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .pd-divider {
+            border: none;
+            border-top: 1px solid #ececec;
+            margin: 0 0 20px;
+        }
+        .pd-label {
+            font-size: 0.72rem;
             font-weight: 600;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+            color: #888;
+            display: block;
+            margin-bottom: 8px;
+        }
+        .pd-section {
+            margin-bottom: 20px;
         }
         
         .size-chart-link {
@@ -482,16 +536,72 @@ $productReviews = getProductReviews($productId);
             margin-bottom: 10px;
         }
         
+        /* ── Infinite feature ticker ── */
+        @keyframes ticker {
+            0%   { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+        .feature-ticker {
+            overflow: hidden;
+            background-color: #5881F6;
+            border-radius: 5px;
+            padding: 11px 0;
+            margin-bottom: 20px;
+        }
+        .feature-ticker-track {
+            display: inline-flex;
+            white-space: nowrap;
+            animation: ticker 14s linear infinite;
+            will-change: transform;
+        }
+        .feature-ticker-track span {
+            color: white;
+            padding: 0 22px;
+            font-size: 13px;
+            letter-spacing: 0.5px;
+        }
+        .feature-ticker-track .sep {
+            color: rgba(255,255,255,0.45);
+            padding: 0 2px;
+        }
+
+        /* ── Quantity + Share side by side ── */
+        .qty-share-row {
+            display: flex;
+            gap: 14px;
+            align-items: flex-end;
+            margin-bottom: 20px;
+        }
+        .qty-block,
+        .share-block { flex: 1; }
+        .share-btn-inline {
+            width: 100%;
+            height: 40px;
+            background: #343A40;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: background 0.2s;
+        }
+        .share-btn-inline:hover { background: #000; }
+
         @media (max-width: 768px) {
             .product-title-detail {
                 font-size: 2rem;
             }
-            
             .thumbnail-container {
                 justify-content: center;
             }
         }
 
+        </style>
         <style>
         /* Additional styles for popup modals */
         .modal-overlay {
@@ -871,63 +981,43 @@ $productReviews = getProductReviews($productId);
             
             <!-- Product Details Column -->
             <div class="col-lg-6">
-                <h1 class="product-title-detail"><?= htmlspecialchars($product['name']) ?></h1>
-                
-                <!-- Product Rating -->
-                <?php if ($productRating['count'] > 0): ?>
-                    <div class="rating-stars mb-2">
-                        <?php for ($i = 1; $i <= 5; $i++): ?>
-                            <i class="fas fa-star <?= $i <= $productRating['average'] ? '' : 'text-muted' ?>"></i>
-                        <?php endfor; ?>
-                        <span class="ml-2">(<?= $productRating['count'] ?> reviews)</span>
-                    </div>
-                <?php endif; ?>
-                
-                <h2 class="product-price-detail">₹<?= number_format($product['price'], 2) ?></h2>
-                <p class="text-muted">Taxes included. <?php if ($product['stock_quantity'] > 10): ?>Free shipping on orders above ₹850<?php endif; ?></p>
-                
-                <!-- Stock Status -->
+
                 <?php
                 if ($product['stock_quantity'] <= 0) {
-                    $stockClass = 'stock-out-of-stock';
-                    $stockText = 'Out of Stock';
+                    $stockClass = 'stock-out-of-stock'; $stockText = 'Out of Stock';
                 } elseif ($product['stock_quantity'] <= $product['low_stock_threshold']) {
-                    $stockClass = 'stock-low-stock';
-                    $stockText = 'Only ' . $product['stock_quantity'] . ' left in stock';
+                    $stockClass = 'stock-low-stock';    $stockText = 'Only ' . $product['stock_quantity'] . ' left';
                 } else {
-                    $stockClass = 'stock-in-stock';
-                    $stockText = 'In Stock';
+                    $stockClass = 'stock-in-stock';     $stockText = 'In Stock';
                 }
                 ?>
-                <div class="stock-status <?= $stockClass ?>">
-                    <?= $stockText ?>
-                </div>
-                
-                <!-- Size Chart Link -->
-                <a class="size-chart-link" data-toggle="modal" data-target="#sizeChartModal">
-                    <i class="fas fa-ruler mr-2"></i>
-                    Size Chart
-                </a>
 
-                <!-- Promo Banner -->
-                <div class="promo-banner mt-4">
-                    <strong>COMBO OFFERS</strong>
-                    <div>BUY ANY <strong>3</strong> PRODUCTS <strong>@ 1199</strong></div>
-                    <div>BUY ANY <strong>5</strong> PRODUCTS <strong>@ 1699</strong> </div>
-                </div>
-                
+                <!-- 1. Product Name -->
+                <h1 class="pd-name"><?= htmlspecialchars($product['name']) ?></h1>
+
+                <!-- 2. Product Description -->
+                <?php if ($product['description']): ?>
+                    <p class="pd-description"><?= nl2br(htmlspecialchars($product['description'])) ?></p>
+                <?php endif; ?>
+
+                <!-- 3. Price -->
+                <div class="pd-price-block">&#x20B9;<?= number_format($product['price'], 0, '.', ',') ?></div>
+
+                <!-- 4. Tax included -->
+                <span class="pd-tax">Taxes included<?php if ($product['stock_quantity'] > 10): ?> &middot; Free shipping above &#x20B9;850<?php endif; ?></span>
+
                 <!-- Product Form -->
                 <form id="productForm" onsubmit="handleAddToCart(event)">
                     <input type="hidden" name="product_id" value="<?= $product['id'] ?>">
-                    
-                    <!-- Size Selection -->
+
+                    <!-- 5. Size Selection -->
                     <?php if (!empty($availableSizes)): ?>
-                        <div class="size-section mt-4">
-                            <p><strong>Size</strong></p>
+                        <div class="pd-section">
+                            <span class="pd-label">Size</span>
                             <div class="size-buttons">
                                 <?php foreach ($availableSizes as $index => $size): ?>
-                                    <button type="button" 
-                                            class="size-btn <?= $index === 0 ? 'active' : '' ?>" 
+                                    <button type="button"
+                                            class="size-btn <?= $index === 0 ? 'active' : '' ?>"
                                             data-size="<?= htmlspecialchars($size) ?>"
                                             onclick="selectSize(this, '<?= htmlspecialchars($size) ?>')">
                                         <?= htmlspecialchars($size) ?>
@@ -937,48 +1027,67 @@ $productReviews = getProductReviews($productId);
                             <input type="hidden" name="size" value="<?= htmlspecialchars($availableSizes[0]) ?>">
                         </div>
                     <?php endif; ?>
-                    
-                    <!-- Quantity Selection -->
-                    <div class="quantity-section mt-4">
-                        <p><strong>Quantity</strong></p>
-                        <div class="quantity-selector">
-                            <button type="button" class="quantity-btn decrement" onclick="changeQuantity(-1)">−</button>
-                            <input type="number" class="quantity-input" name="quantity" value="1" min="1" max="<?= $product['stock_quantity'] ?>" readonly>
-                            <button type="button" class="quantity-btn increment" onclick="changeQuantity(1)">+</button>
+
+                    <!-- 6. In Stock + Size Chart (same row) -->
+                    <div class="pd-meta-row">
+                        <div class="stock-status <?= $stockClass ?>" style="margin:0;">
+                            <?= $stockText ?>
+                        </div>
+                        <a class="size-chart-link" data-toggle="modal" data-target="#sizeChartModal" style="margin:0;">
+                            <i class="fas fa-ruler mr-1"></i> Size Chart
+                        </a>
+                    </div>
+
+                    <!-- 7. Quantity & Share -->
+                    <div class="qty-share-row">
+                        <div class="qty-block">
+                            <span class="pd-label">Quantity</span>
+                            <div class="quantity-selector">
+                                <button type="button" class="quantity-btn decrement" onclick="changeQuantity(-1)">−</button>
+                                <input type="number" class="quantity-input" name="quantity" value="1" min="1" max="<?= $product['stock_quantity'] ?>" readonly>
+                                <button type="button" class="quantity-btn increment" onclick="changeQuantity(1)">+</button>
+                            </div>
+                        </div>
+                        <div class="share-block">
+                            <span class="pd-label">Share</span>
+                            <button type="button" class="share-btn-inline" onclick="shareProduct()">
+                                <i class="fas fa-share-alt"></i> Share
+                            </button>
                         </div>
                     </div>
-                    
-                    <!-- Feature Tags -->
-                    <div class="feature-tags mt-4">
-                        <marquee class="text-light" behavior="" direction="left">
-                            Soft & breathable &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Hypoallergenic &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Moisture wicking &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Relaxed fit
-                        </marquee>
+
+                    <!-- 7. Running Text -->
+                    <div class="feature-ticker">
+                        <div class="feature-ticker-track">
+                            <span>Soft &amp; breathable</span><span class="sep">·</span>
+                            <span>Hypoallergenic</span><span class="sep">·</span>
+                            <span>Moisture wicking</span><span class="sep">·</span>
+                            <span>Relaxed fit</span><span class="sep">·</span>
+                            <span>Premium quality</span><span class="sep">·</span>
+                            <span>Soft &amp; breathable</span><span class="sep">·</span>
+                            <span>Hypoallergenic</span><span class="sep">·</span>
+                            <span>Moisture wicking</span><span class="sep">·</span>
+                            <span>Relaxed fit</span><span class="sep">·</span>
+                            <span>Premium quality</span><span class="sep">·</span>
+                        </div>
                     </div>
-                    
-                    <!-- Action Buttons -->
-                    <button type="submit" 
-                            class="add-to-cart-btn mt-4 text-dark" 
+
+                    <!-- 8. Add to Cart -->
+                    <button type="submit"
+                            class="add-to-cart-btn mt-4"
                             <?= $product['stock_quantity'] <= 0 ? 'disabled' : '' ?>>
                         <span class="loading"><i class="fas fa-spinner fa-spin"></i></span>
-                        <span class="btn-text">
-                            <?= $product['stock_quantity'] <= 0 ? 'Out of Stock' : 'Add to cart' ?>
-                        </span>
+                        <span class="btn-text"><?= $product['stock_quantity'] <= 0 ? 'Out of Stock' : 'Add to cart' ?></span>
                     </button>
-                    
-                    <button type="button" 
-                            class="buy-now-btn" 
+
+                    <!-- 9. Buy Now -->
+                    <button type="button"
+                            class="buy-now-btn"
                             onclick="buyNow()"
                             <?= $product['stock_quantity'] <= 0 ? 'disabled' : '' ?>>
                         <?= $product['stock_quantity'] <= 0 ? 'Out of Stock' : 'Buy it now' ?>
                     </button>
                 </form>
-                
-                <!-- Product Description -->
-                <?php if ($product['description']): ?>
-                    <div class="mt-4">
-                        <p><?= nl2br(htmlspecialchars($product['description'])) ?></p>
-                    </div>
-                <?php endif; ?>
                 
                 <!-- Product Details Accordion -->
                 <div class="product-detail-section mt-4 d-none">
@@ -991,9 +1100,6 @@ $productReviews = getProductReviews($productId);
                         <p>Premium quality with excellent craftsmanship</p>
                         <p>Soft and breathable material</p>
                         <p>Available in multiple sizes</p>
-                        <?php if ($product['description']): ?>
-                            <p><?= nl2br(htmlspecialchars($product['description'])) ?></p>
-                        <?php endif; ?>
                     </div>
                 </div>
                 
@@ -1024,11 +1130,6 @@ $productReviews = getProductReviews($productId);
                     </div>
                 <?php endif; ?>
                 
-                <!-- Share Button -->
-                <a href="#" class="share-btn mt-4" onclick="shareProduct()">
-                    <i class="fas fa-share-alt mr-2"></i>
-                    Share
-                </a>
             </div>
         </div>
         
@@ -1080,16 +1181,16 @@ $productReviews = getProductReviews($productId);
                         <div class="product-card p-2 col-6 col-md-6 col-lg-3 mb-4">
                             <a class="text-decoration-none text-dark" href="product.php?id=<?= $relatedProduct['id'] ?>">
                                 <div class="image-container rounded-0">
-                                    <img src="<?= htmlspecialchars($relatedProduct['primary_image'] ?: '../assets/images/default-product.jpg') ?>"
+                                    <img src="<?= htmlspecialchars(BASE_PATH . ($relatedProduct['primary_image'] ?: '/assets/images/default-product.jpg')) ?>"
                                          alt="<?= htmlspecialchars($relatedProduct['name']) ?>" class="default-img rounded-0">
-                                    <img src="<?= htmlspecialchars($relatedProduct['primary_image'] ?: '../assets/images/default-product.jpg') ?>"
+                                    <img src="<?= htmlspecialchars(BASE_PATH . ($relatedProduct['primary_image'] ?: '/assets/images/default-product.jpg')) ?>"
                                          alt="<?= htmlspecialchars($relatedProduct['name']) ?>" class="hover-img h-100 rounded-0">
                                 </div>
                                 <h5 class="product-title"><?= htmlspecialchars($relatedProduct['name']) ?></h5>
                                 <p class="product-price text-left pl-2">₹<?= number_format($relatedProduct['price'], 2) ?></p>
                             </a>
                             <?php
-                            $relatedSizes = $relatedProduct['sizes'] ? json_decode($relatedProduct['sizes'], true) : ['S', 'M', 'L', 'XL', 'XXL'];
+                            $relatedSizes = normalizeSizes($relatedProduct['sizes'] ?? '') ?: ['S', 'M', 'L', 'XL', 'XXL'];
                             ?>
                             <div class="px-2 pb-1">
                                 <div class="btn-group btn-group-toggle size-options" data-toggle="buttons">
@@ -1570,6 +1671,9 @@ $productReviews = getProductReviews($productId);
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js"></script>
     <!-- ===== NAVBAR JAVASCRIPT (Add before closing </body> tag) ===== -->
     <script>
+    const BASE_PATH = '<?= BASE_PATH ?>';
+    </script>
+    <script>
     // SIMPLIFIED AUTH FOR NON-INDEX PAGES
     (function() {
         'use strict';
@@ -1578,7 +1682,7 @@ $productReviews = getProductReviews($productId);
         const GOOGLE_CLIENT_ID = "340757900430-i8nl6l45ndveq9jmbvbah7ugquauj803.apps.googleusercontent.com";
         const AUTH_ENDPOINT = "<?= $basePath ?>auth/google-callback.php";
         
-        let currentUser = <?= $isLoggedIn ? 'true' : 'false' ?>;
+        window.currentUser = <?= $isLoggedIn ? 'true' : 'false' ?>;
         let googleInitialized = false;
         
         // Initialize Google Sign-In API (WITHOUT silent auth)
@@ -1658,7 +1762,7 @@ $productReviews = getProductReviews($productId);
             
             if (!googleInitialized && !initializeGoogle()) {
                 // Fallback - show alert and reload
-                alert('Authentication system not ready. Please refresh the page and try again.');
+                if (window.showToast) showToast('Authentication system not ready. Please refresh the page.', 'warning');
                 window.location.reload();
                 return;
             }
@@ -1667,14 +1771,14 @@ $productReviews = getProductReviews($productId);
                 google.accounts.id.prompt((notification) => {
                     if (notification.isNotDisplayed()) {
                         // One-Tap not available - show alert and reload
-                        alert('Login not available at the moment. Please refresh the page and try again.');
+                        if (window.showToast) showToast('Login not available right now. Please refresh the page.', 'warning');
                         window.location.reload();
                     }
                 });
             } catch (error) {
                 console.error('One-Tap login error:', error);
                 // Fallback - show alert and reload
-                alert('Login system error. Please refresh the page and try again.');
+                if (window.showToast) showToast('Login system error. Please refresh the page.', 'error');
                 window.location.reload();
             }
         };
@@ -2217,65 +2321,6 @@ function displayReferralData(data) {
         });
     }
 
-    // Search functionality - EXACT COPY FROM INDEX.PHP
-    function toggleSearch() {
-        $('#searchModal').modal('show');
-        document.getElementById('searchInput').focus();
-    }
-
-    async function performSearch() {
-        const searchTerm = document.getElementById('searchInput').value.trim();
-        
-        if (searchTerm.length < 2) {
-            return;
-        }
-
-        try {
-            const basePath = '<?= $basePath ?>';
-            const response = await fetch(`${basePath}shop/api/search.php?q=${encodeURIComponent(searchTerm)}`);
-            const data = await response.json();
-
-            if (data.success) {
-                displaySearchResults(data.products);
-            } else {
-                document.getElementById('searchResults').innerHTML = '<p class="text-muted">No products found.</p>';
-            }
-        } catch (error) {
-            console.error('Search error:', error);
-            document.getElementById('searchResults').innerHTML = '<p class="text-danger">Search failed. Please try again.</p>';
-        }
-    }
-
-    function displaySearchResults(products) {
-        const resultsContainer = document.getElementById('searchResults');
-        
-        if (products.length === 0) {
-            resultsContainer.innerHTML = '<p class="text-muted">No products found.</p>';
-            return;
-        }
-
-        const basePath = '<?= $basePath ?>';
-        let html = '<div class="row">';
-        products.forEach(product => {
-            html += `
-                <div class="col-md-4 mb-3">
-                    <div class="card">
-                        <img src="${product.primary_image || basePath + 'assets/images/default-product.jpg'}" 
-                            class="card-img-top" style="height: 200px; object-fit: cover;">
-                        <div class="card-body">
-                            <h6 class="card-title">${product.name}</h6>
-                            <p class="card-text">₹${parseFloat(product.price).toFixed(2)}</p>
-                            <a href="${basePath}shop/product.php?id=${product.id}" class="btn btn-primary btn-sm">View Product</a>
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-        html += '</div>';
-        
-        resultsContainer.innerHTML = html;
-    }
-
     // Utility functions - EXACT COPY FROM INDEX.PHP
     function showNotification(message, type) {
         // Create notification element
@@ -2398,46 +2443,52 @@ function displayReferralData(data) {
         // Add to cart functionality
         async function handleAddToCart(event) {
             event.preventDefault();
-            
+
             const form = event.target;
             const submitBtn = form.querySelector('.add-to-cart-btn');
+            if (submitBtn.disabled) return; // block double-submit
+
             const loading = submitBtn.querySelector('.loading');
             const btnText = submitBtn.querySelector('.btn-text');
-            
+
             // Show loading state
             loading.classList.add('show');
+            btnText.textContent = 'Adding...';
             submitBtn.disabled = true;
-            
+
             try {
                 const formData = new FormData(form);
-                formData.append('action', 'add');  // ← CHANGED FROM 'add_to_cart' TO 'add'
-                
+                formData.append('action', 'add');
+
                 const response = await fetch('api/cart.php', {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (data.success) {
-                    showNotification('Product added to cart!', 'success');
                     updateCartCount(data.cart_summary?.item_count || 0);
-                    
-                    // Update button text temporarily
+                    loading.classList.remove('show');
                     btnText.textContent = 'Added to Cart!';
+                    // Keep disabled during success state, re-enable after 2s
                     setTimeout(() => {
                         btnText.textContent = 'Add to cart';
+                        submitBtn.disabled = false;
                     }, 2000);
                 } else {
+                    loading.classList.remove('show');
+                    btnText.textContent = 'Add to cart';
+                    submitBtn.disabled = false;
                     showNotification(data.message || 'Failed to add to cart', 'error');
                 }
-                
+
             } catch (error) {
                 console.error('Error adding to cart:', error);
-                showNotification('Error adding product to cart', 'error');
-            } finally {
                 loading.classList.remove('show');
+                btnText.textContent = 'Add to cart';
                 submitBtn.disabled = false;
+                showNotification('Error adding product to cart', 'error');
             }
         }
 
@@ -2525,7 +2576,6 @@ function displayReferralData(data) {
                 const data = await response.json();
 
                 if (data.success) {
-                    showNotification('Product added to cart!', 'success');
                     updateCartCount(data.cart_summary?.item_count || 0);
                 } else {
                     showNotification(data.message || 'Failed to add to cart', 'error');
@@ -2567,72 +2617,6 @@ function displayReferralData(data) {
             }
         }
 
-        // Search functionality
-        function toggleSearch() {
-            $('#searchModal').modal('show');
-            setTimeout(() => document.getElementById('searchInput').focus(), 500);
-        }
-
-        function handleSearchKeypress(event) {
-            if (event.key === 'Enter') {
-                performSearch();
-            }
-        }
-
-        async function performSearch() {
-            const searchTerm = document.getElementById('searchInput').value.trim();
-            
-            if (searchTerm.length < 2) {
-                showNotification('Please enter at least 2 characters', 'warning');
-                return;
-            }
-
-            try {
-                const response = await fetch(`api/search.php?q=${encodeURIComponent(searchTerm)}`);
-                const data = await response.json();
-
-                if (data.success && data.products) {
-                    displaySearchResults(data.products);
-                } else {
-                    document.getElementById('searchResults').innerHTML = '<p class="text-muted">No products found.</p>';
-                }
-            } catch (error) {
-                console.error('Search error:', error);
-                document.getElementById('searchResults').innerHTML = '<p class="text-danger">Search failed. Please try again.</p>';
-            }
-        }
-
-        function displaySearchResults(products) {
-            const resultsContainer = document.getElementById('searchResults');
-            
-            if (products.length === 0) {
-                resultsContainer.innerHTML = '<p class="text-muted">No products found.</p>';
-                return;
-            }
-
-            let html = '<div class="row">';
-            products.forEach(product => {
-                html += `
-                    <div class="col-md-4 mb-3">
-                        <div class="card">
-                            <img src="${product.primary_image || '../assets/images/default-product.jpg'}" 
-                                 class="card-img-top" style="height: 200px; object-fit: cover;" 
-                                 alt="${product.name}">
-                            <div class="card-body">
-                                <h6 class="card-title">${product.name}</h6>
-                                <p class="card-text">₹${parseFloat(product.price).toFixed(2)}</p>
-                                <a href="product.php?id=${product.id}" class="btn btn-primary btn-sm">View Product</a>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-            html += '</div>';
-            
-            resultsContainer.innerHTML = html;
-        }
-
-
         // User menu toggle
         function toggleUserMenu() {
             window.location.href = '../referral/dashboard.php';
@@ -2641,21 +2625,12 @@ function displayReferralData(data) {
         // Utility functions
         function updateCartCount(count) {
             const cartBadge = document.getElementById('cartBadge');
-            if (count > 0) {
-                if (cartBadge) {
+            if (cartBadge) {
+                if (count > 0) {
                     cartBadge.textContent = count;
+                    cartBadge.classList.remove('d-none');
                 } else {
-                    const cartIcon = document.querySelector('.fa-bag-shopping');
-                    const badge = document.createElement('span');
-                    badge.id = 'cartBadge';
-                    badge.className = 'position-absolute badge badge-danger';
-                    badge.style.cssText = 'top: -8px; right: -8px; font-size: 0.7rem;';
-                    badge.textContent = count;
-                    cartIcon.parentElement.appendChild(badge);
-                }
-            } else {
-                if (cartBadge) {
-                    cartBadge.remove();
+                    cartBadge.classList.add('d-none');
                 }
             }
         }

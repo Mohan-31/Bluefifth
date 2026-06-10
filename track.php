@@ -9,7 +9,7 @@ $currentUser   = $isLoggedIn ? getCurrentUser() : null;
 $isLoggedIn    = $isLoggedIn && ($currentUser !== null);
 $userId        = $isLoggedIn ? $currentUser['id'] : null;
 $categories    = getAllCategories();
-$cartSummary   = $isLoggedIn ? getCartSummary($userId)   : ['item_count' => 0];
+$cartSummary   = $isLoggedIn ? getCartSummary($userId)   : getSessionCartSummary();
 $walletBalance = $isLoggedIn ? getWalletBalance($userId) : ['points' => 0, 'pending_points' => 0];
 $siteName    = getSetting('site_name', 'bluefifth');
 $currencySymbol = getSetting('currency_symbol', '₹');

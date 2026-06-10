@@ -89,13 +89,13 @@ function handleGetOrders() {
         if (!empty($_GET['date_range'])) {
             switch ($_GET['date_range']) {
                 case 'today':
-                    $filters[] = "DATE(o.created_at) = CURDATE()";
+                    $filters[] = "DATE(o.created_at) = CURRENT_DATE";
                     break;
                 case 'week':
-                    $filters[] = "o.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+                    $filters[] = "o.created_at >= NOW() - INTERVAL '7 days'";
                     break;
                 case 'month':
-                    $filters[] = "o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+                    $filters[] = "o.created_at >= NOW() - INTERVAL '30 days'";
                     break;
             }
         }

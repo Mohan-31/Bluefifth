@@ -40,7 +40,7 @@ if ($visitorUserId == $referrerId) {
 $visitorIp = getClientIP();
 
 // Check if this IP has visited via this referral before
-$stmt = $conn->prepare("SELECT id FROM referral_visits WHERE referral_id = ? AND visitor_ip = ? AND DATE(visited_at) = CURDATE()");
+$stmt = $conn->prepare("SELECT id FROM referral_visits WHERE referral_id = ? AND visitor_ip = ? AND DATE(visited_at) = CURRENT_DATE");
 $stmt->execute([$referralId, $visitorIp]);
 
 if ($stmt->rowCount() == 0) {

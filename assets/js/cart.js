@@ -339,10 +339,13 @@ class VelonaCart {
     // ============================================================================
     
     handleAddToCart(event) {
-        event.preventDefault();
-        
         const button = $(event.currentTarget);
         const productId = button.data('product-id') || button.attr('data-product-id');
+
+        // No data-product-id means this is a form submit button — let the form's onsubmit handle it
+        if (!productId) return;
+
+        event.preventDefault();
         const productName = button.data('product-name') || button.attr('data-product-name');
         const quantity = parseInt(button.data('quantity') || 1);
         
@@ -696,7 +699,7 @@ class VelonaCart {
             html += `
                 <div class="cart-item" data-cart-id="${item.id || item.cart_key}">
                     <div class="item-image">
-                        <img src="${item.product_image || '../assets/images/default-product.jpg'}" 
+                        <img src="${(window._imgBase||'') + (item.product_image || '/assets/images/default-product.jpg')}"
                              alt="${item.product_name}" />
                     </div>
                     <div class="item-details">
@@ -797,7 +800,7 @@ class VelonaCart {
                 initGoogleSignIn();
             } else {
                 // Fallback - refresh page and try again
-                alert('Please refresh the page and try logging in again.');
+                if (window.showToast) showToast('Please refresh the page and try logging in again.', 'warning');
                 window.location.reload();
             }
         }

@@ -1,5 +1,6 @@
 <?php
 // shop/api/cart.php - Complete Cart API for both authenticated and guest users
+ob_start(); // buffer any stray PHP notices so they don't corrupt the JSON response
 session_start();
 require_once '../../includes/database.php';
 require_once '../../includes/functions.php';
@@ -48,22 +49,22 @@ try {
             $size = $_POST['size'] ?? null;
             
             if ($productId <= 0 || $quantity <= 0) {
+                ob_clean();
                 echo json_encode(['success' => false, 'message' => 'Invalid product or quantity']);
                 exit;
             }
-            
+
             // Check if user is logged in
             if (isLoggedIn()) {
-                // Logged in user - add to database cart
                 $currentUser = getCurrentUser();
                 $result = addToCart($currentUser['id'], $productId, $quantity, $size);
                 $cartSummary = getCartSummary($currentUser['id']);
             } else {
-                // Guest user - add to session cart (function now in functions.php)
                 $result = addToSessionCart($productId, $quantity, $size);
                 $cartSummary = getSessionCartSummary();
             }
-            
+
+            ob_clean(); // ensure clean JSON — no stray notices
             if ($result['success']) {
                 echo json_encode([
                     'success' => true,
@@ -626,13 +627,14 @@ function sendSuccessResponse($message, $data = []) {
         'message' => $message,
         'timestamp' => time()
     ];
-    
+
     if (!empty($data)) {
         $response['data'] = $data;
         // Also add data at root level for backward compatibility
         $response = array_merge($response, $data);
     }
-    
+
+    ob_clean(); // discard any PHP notices buffered above
     http_response_code(200);
     echo json_encode($response);
     exit;
@@ -647,7 +649,8 @@ function sendErrorResponse($message, $code = 400) {
         'message' => $message,
         'timestamp' => time()
     ];
-    
+
+    ob_clean(); // discard any PHP notices buffered above
     http_response_code($code);
     echo json_encode($response);
     exit;

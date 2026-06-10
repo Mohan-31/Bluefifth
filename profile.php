@@ -1474,63 +1474,6 @@ async function addToCartFromSlider(event, productId) {
     }
 }
 
-// Search functionality
-function toggleSearch() {
-    $('#searchModal').modal('show');
-    document.getElementById('searchInput').focus();
-}
-
-async function performSearch() {
-    const searchTerm = document.getElementById('searchInput').value.trim();
-    
-    if (searchTerm.length < 2) {
-        return;
-    }
-
-    try {
-        const response = await fetch(`shop/api/search.php?q=${encodeURIComponent(searchTerm)}`);
-        const data = await response.json();
-
-        if (data.success) {
-            displaySearchResults(data.products);
-        } else {
-            document.getElementById('searchResults').innerHTML = '<p class="text-muted">No products found.</p>';
-        }
-    } catch (error) {
-        console.error('Search error:', error);
-        document.getElementById('searchResults').innerHTML = '<p class="text-danger">Search failed. Please try again.</p>';
-    }
-}
-
-function displaySearchResults(products) {
-    const resultsContainer = document.getElementById('searchResults');
-    
-    if (products.length === 0) {
-        resultsContainer.innerHTML = '<p class="text-muted">No products found.</p>';
-        return;
-    }
-
-    let html = '<div class="row">';
-    products.forEach(product => {
-        html += `
-            <div class="col-md-4 mb-3">
-                <div class="card">
-                    <img src="${product.primary_image || '/assets/images/default-product.jpg'}" 
-                         class="card-img-top" style="height: 200px; object-fit: cover;">
-                    <div class="card-body">
-                        <h6 class="card-title">${product.name}</h6>
-                        <p class="card-text">₹${parseFloat(product.price).toFixed(2)}</p>
-                        <a href="shop/product.php?id=${product.id}" class="btn btn-primary btn-sm">View Product</a>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    html += '</div>';
-    
-    resultsContainer.innerHTML = html;
-}
-
 // Newsletter subscription
 async function subscribeNewsletter(event) {
     event.preventDefault();

@@ -77,17 +77,17 @@ function ensureShiprocketColumns() {
         $conn = getConnection();
         
         // Check existing columns
-        $stmt = $conn->query("DESCRIBE orders");
+        $stmt = $conn->query("SELECT column_name FROM information_schema.columns WHERE table_name = 'orders' AND table_schema = 'public'");
         $existingColumns = $stmt->fetchAll(PDO::FETCH_COLUMN);
-        
+
         // Define required Shiprocket columns
         $requiredColumns = [
             'shiprocket_shipment_id' => 'VARCHAR(100) NULL',
-            'shiprocket_order_id' => 'VARCHAR(100) NULL',
-            'tracking_number' => 'VARCHAR(100) NULL',
-            'courier_partner' => 'VARCHAR(100) NULL',
-            'shipped_at' => 'DATETIME NULL',
-            'delivered_at' => 'DATETIME NULL'
+            'shiprocket_order_id'    => 'VARCHAR(100) NULL',
+            'tracking_number'        => 'VARCHAR(100) NULL',
+            'courier_partner'        => 'VARCHAR(100) NULL',
+            'shipped_at'             => 'TIMESTAMP NULL',
+            'delivered_at'           => 'TIMESTAMP NULL'
         ];
         
         // Add missing columns
@@ -732,7 +732,7 @@ function handleGetShippingStats() {
             $metricsQuery = "
                 SELECT COUNT(*) as shipments_last_30_days
                 FROM orders 
-                WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                WHERE created_at >= NOW() - INTERVAL '30 days'
                 AND status IN ('delivered', 'shipped', 'processing', 'pending')
             ";
             $stmt = $conn->prepare($metricsQuery);
@@ -1530,7 +1530,7 @@ function handleGetEmailStats() {
                 SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as emails_delivered_today,
                 SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as emails_failed_today
             FROM email_notifications 
-            WHERE DATE(sent_at) = CURDATE()
+            WHERE DATE(sent_at) = CURRENT_DATE
         ");
         $todayStats = $stmt->fetch();
         
@@ -1858,10 +1858,10 @@ function syncAllTrackingData($token) {
         
         // Build query that works with basic orders table structure
         $sql = "SELECT id, order_number, status";
-        
+
         // Check if additional columns exist
         try {
-            $checkColumns = $conn->query("DESCRIBE orders");
+            $checkColumns = $conn->query("SELECT column_name FROM information_schema.columns WHERE table_name = 'orders' AND table_schema = 'public'");
             $columns = $checkColumns->fetchAll(PDO::FETCH_COLUMN);
             
             if (in_array('shiprocket_shipment_id', $columns)) {
@@ -2237,7 +2237,7 @@ function getBulkEmailRecipients($groups) {
                     FROM users u
                     JOIN orders o ON u.id = o.user_id
                     WHERE u.email IS NOT NULL AND u.email != '' 
-                    AND o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                    AND o.created_at >= NOW() - INTERVAL '30 days'
                     ORDER BY u.name ASC
                 ");
                 $recipients = array_merge($recipients, $stmt->fetchAll());
@@ -2514,24 +2514,22 @@ function verifySettingsTable() {
         $conn = getConnection();
         
         // Check if settings table exists
-        $stmt = $conn->query("SHOW TABLES LIKE 'settings'");
-        
-        if ($stmt->rowCount() == 0) {
-            // Create settings table
+        $stmt = $conn->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'settings' AND table_schema = 'public'");
+        $tableExists = (int) $stmt->fetchColumn() > 0;
+
+        if (!$tableExists) {
+            // Create settings table (PostgreSQL syntax)
             $createTableSQL = "
-                CREATE TABLE `settings` (
-                    `id` int(11) NOT NULL AUTO_INCREMENT,
-                    `setting_key` varchar(100) NOT NULL,
-                    `setting_value` text DEFAULT NULL,
-                    `setting_type` varchar(20) DEFAULT 'string',
-                    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    PRIMARY KEY (`id`),
-                    UNIQUE KEY `setting_key` (`setting_key`),
-                    KEY `setting_type` (`setting_type`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                CREATE TABLE IF NOT EXISTS settings (
+                    id          SERIAL       PRIMARY KEY,
+                    setting_key VARCHAR(100) NOT NULL UNIQUE,
+                    setting_value TEXT        DEFAULT NULL,
+                    setting_type  VARCHAR(20) DEFAULT 'string',
+                    created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
             ";
-            
+
             $conn->exec($createTableSQL);
             error_log("Settings table created successfully");
             
@@ -2542,7 +2540,7 @@ function verifySettingsTable() {
         }
         
         // Verify table structure
-        $stmt = $conn->query("DESCRIBE settings");
+        $stmt = $conn->query("SELECT column_name FROM information_schema.columns WHERE table_name = 'settings' AND table_schema = 'public'");
         $columns = $stmt->fetchAll(PDO::FETCH_COLUMN);
         
         $requiredColumns = ['setting_key', 'setting_value', 'setting_type', 'created_at', 'updated_at'];
@@ -2824,7 +2822,7 @@ function handleGetSettingsInfo() {
         $stmt = $conn->query("
             SELECT setting_key, updated_at 
             FROM settings 
-            WHERE updated_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+            WHERE updated_at >= NOW() - INTERVAL '24 hours'
             ORDER BY updated_at DESC 
             LIMIT 10
         ");
@@ -2833,7 +2831,7 @@ function handleGetSettingsInfo() {
         // Get system info
         $systemInfo = [
             'php_version' => PHP_VERSION,
-            'database_type' => 'MySQL/MariaDB',
+            'database_type' => 'PostgreSQL (Neon)',
             'settings_table_exists' => true,
             'total_settings' => intval($settingsCount),
             'email_config_exists' => file_exists('../../includes/email-config.php'),
@@ -2873,29 +2871,27 @@ function handleSystemMaintenance() {
         
         // Task 1: Clean old email notifications
         try {
-            $stmt = $conn->prepare("DELETE FROM email_notifications WHERE sent_at < DATE_SUB(NOW(), INTERVAL 90 DAY)");
+            $stmt = $conn->prepare("DELETE FROM email_notifications WHERE sent_at < NOW() - INTERVAL '90 days'");
             $stmt->execute();
             $cleanedEmails = $stmt->rowCount();
-            $stmt = null; // Close properly
+            $stmt = null;
             $results['details']['email_cleanup'] = "Cleaned {$cleanedEmails} old email records";
             $results['tasks_completed']++;
         } catch (Exception $e) {
             $results['details']['email_cleanup'] = "Failed: " . $e->getMessage();
             $results['tasks_failed']++;
         }
-        
+
         // Task 2: Clean old visitor tracking (if table exists)
         try {
-            $stmt = $conn->prepare("SHOW TABLES LIKE 'referral_visits'");
-            $stmt->execute();
-            $tableExists = $stmt->fetch();
-            $stmt = null; // Close properly
-            
+            $chk = $conn->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'referral_visits' AND table_schema = 'public'");
+            $tableExists = (int) $chk->fetchColumn() > 0;
+
             if ($tableExists) {
-                $stmt = $conn->prepare("DELETE FROM referral_visits WHERE visited_at < DATE_SUB(NOW(), INTERVAL 30 DAY)");
+                $stmt = $conn->prepare("DELETE FROM referral_visits WHERE visited_at < NOW() - INTERVAL '30 days'");
                 $stmt->execute();
                 $cleanedVisits = $stmt->rowCount();
-                $stmt = null; // Close properly
+                $stmt = null;
                 $results['details']['visitor_cleanup'] = "Cleaned {$cleanedVisits} old visitor records";
             } else {
                 $results['details']['visitor_cleanup'] = "Referral visits table not found - skipped";
@@ -2905,16 +2901,14 @@ function handleSystemMaintenance() {
             $results['details']['visitor_cleanup'] = "Failed: " . $e->getMessage();
             $results['tasks_failed']++;
         }
-        
+
         // Task 3: Clean old activity logs (if table exists)
         try {
-            $stmt = $conn->prepare("SHOW TABLES LIKE 'activity_logs'");
-            $stmt->execute();
-            $tableExists = $stmt->fetch();
-            $stmt = null; // Close properly
-            
+            $chk = $conn->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'activity_logs' AND table_schema = 'public'");
+            $tableExists = (int) $chk->fetchColumn() > 0;
+
             if ($tableExists) {
-                $stmt = $conn->prepare("DELETE FROM activity_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL 60 DAY)");
+                $stmt = $conn->prepare("DELETE FROM activity_logs WHERE created_at < NOW() - INTERVAL '60 days'");
                 $stmt->execute();
                 $cleanedActivity = $stmt->rowCount();
                 $stmt = null; // Close properly
@@ -2934,19 +2928,16 @@ function handleSystemMaintenance() {
             $optimizedTables = 0;
             foreach ($tables as $table) {
                 try {
-                    $stmt = $conn->prepare("SHOW TABLES LIKE ?");
-                    $stmt->execute([$table]);
-                    $tableExists = $stmt->fetch();
-                    $stmt = null; // Close properly
-                    
+                    $chk = $conn->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ? AND table_schema = 'public'");
+                    $chk->execute([$table]);
+                    $tableExists = (int) $chk->fetchColumn() > 0;
+
                     if ($tableExists) {
-                        $stmt = $conn->prepare("OPTIMIZE TABLE `{$table}`");
-                        $stmt->execute();
-                        $stmt = null; // Close properly
+                        $conn->exec("VACUUM ANALYZE {$table}");
                         $optimizedTables++;
                     }
                 } catch (Exception $e) {
-                    error_log("Failed to optimize table {$table}: " . $e->getMessage());
+                    error_log("Failed to vacuum table {$table}: " . $e->getMessage());
                 }
             }
             $results['details']['table_optimization'] = "Optimized {$optimizedTables} database tables";

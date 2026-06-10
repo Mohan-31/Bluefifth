@@ -1283,7 +1283,7 @@ function showGuestOrderLookup() {
 // Navbar variables
 $currentUser   = $isLoggedIn ? getUserById($userId) : null;
 $categories    = getAllCategories();
-$cartSummary   = $isLoggedIn ? getCartSummary($userId)   : ['item_count' => 0];
+$cartSummary   = $isLoggedIn ? getCartSummary($userId)   : getSessionCartSummary();
 $walletBalance = $isLoggedIn ? getWalletBalance($userId) : ['points' => 0, 'pending_points' => 0];
 ?>
 <?php include '../includes/navbar.php'; ?>
@@ -1618,7 +1618,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($userId) : ['points' => 0, 'pend
             // Validate order ID on frontend
             if (!orderId || isNaN(orderId) || orderId <= 0) {
                 console.error('Invalid order ID provided:', orderId);
-                alert('Invalid order ID. Please refresh the page and try again.');
+                if (window.showToast) showToast('Invalid order ID. Please refresh the page.', 'error');
                 return;
             }
             
@@ -1855,7 +1855,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($userId) : ['points' => 0, 'pend
             
             if (!orderId || isNaN(orderId) || orderId <= 0) {
                 console.error('Invalid order ID provided for tracking:', orderId);
-                alert('Invalid order ID. Please refresh the page and try again.');
+                if (window.showToast) showToast('Invalid order ID. Please refresh the page.', 'error');
                 return;
             }
             
@@ -2151,7 +2151,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($userId) : ['points' => 0, 'pend
             // Validate order ID
             if (!orderId || isNaN(orderId) || orderId <= 0) {
                 console.error('Invalid order ID for invoice:', orderId);
-                alert('Invalid order ID. Please refresh the page and try again.');
+                if (window.showToast) showToast('Invalid order ID. Please refresh the page.', 'error');
                 return;
             }
             
@@ -2230,7 +2230,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($userId) : ['points' => 0, 'pend
                     });
                     
                     if (file.size > 5 * 1024 * 1024) {
-                        alert('File is too large. Maximum size is 5MB.');
+                        if (window.showToast) showToast('File is too large. Maximum size is 5MB.', 'warning');
                         this.value = '';
                     }
                 }
@@ -2293,7 +2293,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($userId) : ['points' => 0, 'pend
         // Return Order Functions
         function initiateReturn(orderId) {
             if (!orderId || isNaN(orderId) || orderId <= 0) {
-                alert('Invalid order ID');
+                if (window.showToast) showToast('Invalid order ID. Please refresh the page.', 'error');
                 return;
             }
             
@@ -2358,7 +2358,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($userId) : ['points' => 0, 'pend
             const photoInput = document.getElementById('returnPhoto');
             
             if (!photoInput.files[0]) {
-                alert('Please upload a product photo before proceeding.');
+                if (window.showToast) showToast('Please upload a product photo before proceeding.', 'warning');
                 return;
             }
             
@@ -2366,13 +2366,13 @@ $walletBalance = $isLoggedIn ? getWalletBalance($userId) : ['points' => 0, 'pend
             const maxSize = 5 * 1024 * 1024; // 5MB
             
             if (file.size > maxSize) {
-                alert('Photo size must be less than 5MB. Please choose a smaller image.');
+                if (window.showToast) showToast('Photo size must be less than 5MB. Please choose a smaller image.', 'warning');
                 return;
             }
             
             const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
             if (!allowedTypes.includes(file.type)) {
-                alert('Please upload only JPEG or PNG images.');
+                if (window.showToast) showToast('Please upload only JPEG or PNG images.', 'warning');
                 return;
             }
             
@@ -2421,17 +2421,16 @@ $walletBalance = $isLoggedIn ? getWalletBalance($userId) : ['points' => 0, 'pend
                     if (response.success) {
                         $('#returnModal').modal('hide');
                         const statusMsg = response.status ? ` (Status: ${response.status})` : '';
-                        alert('✅ Return request submitted successfully!' + statusMsg + 
-                              '\n\n📦 Pickup will be scheduled soon.\n💰 Refund will be processed by admin within 2-3 business days.');
-                        location.reload();
+                        if (window.showToast) showToast('Return request submitted! Pickup will be scheduled soon.', 'success');
+                        setTimeout(function() { location.reload(); }, 1200);
                     } else {
-                        alert('❌ Error: ' + (response.message || 'Failed to process return'));
+                        if (window.showToast) showToast(response.message || 'Failed to process return. Please try again.', 'error');
                         $btn.html(originalText).prop('disabled', false);
                     }
                 },
                 error: function(xhr, status, error) {
                     console.log('AJAX Error:', xhr.responseText);
-                    alert('Network error. Please try again.');
+                    if (window.showToast) showToast('Network error. Please try again.', 'error');
                     $btn.html(originalText).prop('disabled', false);
                 }
             });

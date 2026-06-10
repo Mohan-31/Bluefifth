@@ -30,7 +30,7 @@ $isLoggedIn  = $isLoggedIn && ($currentUser !== null);
 $categories = getAllCategories();
 
 // Get user's cart summary if logged in
-$cartSummary = $isLoggedIn ? getCartSummary($currentUser['id']) : ['item_count' => 0];
+$cartSummary = $isLoggedIn ? getCartSummary($currentUser['id']) : getSessionCartSummary();
 
 // Get wallet balance if logged in
 $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' => 0, 'pending_points' => 0];
@@ -654,12 +654,14 @@ $seoDescription = "Search results for '" . htmlspecialchars($searchQuery) . "' -
                                 <div class="product-card">
                                     <a href="product.php?id=<?= $product['id'] ?>" class="text-decoration-none text-dark">
                                         <div class="image-container">
-                                            <?php 
-                                            $primaryImage = $product['primary_image'] ?: '../assets/images/default-product.jpg';
+                                            <?php
+                                            $primaryImage = $product['primary_image']
+                                                ? BASE_PATH . $product['primary_image']
+                                                : BASE_PATH . '/assets/images/default-product.jpg';
                                             ?>
-                                            <img src="<?= htmlspecialchars($primaryImage) ?>" 
+                                            <img src="<?= htmlspecialchars($primaryImage) ?>"
                                                  alt="<?= htmlspecialchars($product['name']) ?>" class="default-img">
-                                            <img src="<?= htmlspecialchars($primaryImage) ?>" 
+                                            <img src="<?= htmlspecialchars($primaryImage) ?>"
                                                  alt="<?= htmlspecialchars($product['name']) ?>" class="hover-img">
                                         </div>
                                         
@@ -791,7 +793,7 @@ $seoDescription = "Search results for '" . htmlspecialchars($searchQuery) . "' -
                                         <div class="col-6 col-md-3 mb-3">
                                             <div class="card">
                                                 <a href="product.php?id=<?= $suggestion['id'] ?>">
-                                                    <img src="<?= htmlspecialchars($suggestion['primary_image'] ?: '../assets/images/default-product.jpg') ?>" 
+                                                    <img src="<?= htmlspecialchars($suggestion['primary_image'] ? BASE_PATH . $suggestion['primary_image'] : BASE_PATH . '/assets/images/default-product.jpg') ?>"
                                                          class="card-img-top" alt="<?= htmlspecialchars($suggestion['name']) ?>" style="height: 150px; object-fit: cover;">
                                                 </a>
                                                 <div class="card-body p-2">
@@ -889,27 +891,6 @@ $seoDescription = "Search results for '" . htmlspecialchars($searchQuery) . "' -
         let isLoggedIn = <?= $isLoggedIn ? 'true' : 'false' ?>;
         let currentQuery = '<?= htmlspecialchars($searchQuery) ?>';
         
-        // Search functionality
-        function toggleSearch() {
-            $('#searchModal').modal('show');
-            setTimeout(() => {
-                $('#searchInput').focus();
-            }, 500);
-        }
-        
-        function handleSearchKeypress(event) {
-            if (event.key === 'Enter') {
-                performNewSearch();
-            }
-        }
-        
-        function performNewSearch() {
-            const query = $('#searchInput').val().trim();
-            if (query) {
-                window.location.href = `search.php?q=${encodeURIComponent(query)}`;
-            }
-        }
-        
         // Filter functionality
         function toggleMobileFilters() {
             $('#searchFilters').toggleClass('show');
@@ -930,7 +911,7 @@ $seoDescription = "Search results for '" . htmlspecialchars($searchQuery) . "' -
             const maxPrice = $('#priceMax').val();
             
             if (minPrice && maxPrice && parseFloat(minPrice) > parseFloat(maxPrice)) {
-                alert('Minimum price cannot be greater than maximum price');
+                if (window.showToast) showToast('Minimum price cannot be greater than maximum price', 'warning');
                 return;
             }
             
@@ -1015,7 +996,7 @@ $seoDescription = "Search results for '" . htmlspecialchars($searchQuery) . "' -
             
             // Make AJAX request
             $.ajax({
-                url: '../api/cart.php',
+                url: 'api/cart.php',
                 method: 'POST',
                 data: {
                     action: 'add',
@@ -1053,7 +1034,7 @@ $seoDescription = "Search results for '" . htmlspecialchars($searchQuery) . "' -
         }
         
         function updateCartBadge() {
-            $.get('../api/cart.php?action=summary', function(response) {
+            $.get('api/cart.php?action=summary', function(response) {
                 if (response.success && response.data.item_count > 0) {
                     const badge = $('#cartBadge');
                     if (badge.length) {
@@ -1114,7 +1095,7 @@ $seoDescription = "Search results for '" . htmlspecialchars($searchQuery) . "' -
                 triggerOneTapLogin();
             } else {
                 // Fallback if One-Tap not available
-                alert('Authentication system not ready. Please refresh and try again.');
+                if (window.showToast) showToast('Authentication system not ready. Please refresh the page.', 'warning');
                 window.location.reload();
             }
         }
@@ -1384,7 +1365,7 @@ $seoDescription = "Search results for '" . htmlspecialchars($searchQuery) . "' -
             
             if (!googleInitialized && !initializeGoogle()) {
                 // Fallback - show alert and reload
-                alert('Authentication system not ready. Please refresh the page and try again.');
+                if (window.showToast) showToast('Authentication system not ready. Please refresh the page.', 'warning');
                 window.location.reload();
                 return;
             }
@@ -1393,14 +1374,14 @@ $seoDescription = "Search results for '" . htmlspecialchars($searchQuery) . "' -
                 google.accounts.id.prompt((notification) => {
                     if (notification.isNotDisplayed()) {
                         // One-Tap not available - show alert and reload
-                        alert('Login not available at the moment. Please refresh the page and try again.');
+                        if (window.showToast) showToast('Login not available right now. Please refresh the page.', 'warning');
                         window.location.reload();
                     }
                 });
             } catch (error) {
                 console.error('One-Tap login error:', error);
                 // Fallback - show alert and reload
-                alert('Login system error. Please refresh the page and try again.');
+                if (window.showToast) showToast('Login system error. Please refresh the page.', 'error');
                 window.location.reload();
             }
         };

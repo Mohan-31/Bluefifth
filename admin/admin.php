@@ -15,14 +15,14 @@ $topReferrers = getTopReferrers(5);
 // Get monthly sales data for chart
 $conn = getConnection();
 $stmt = $conn->query("
-    SELECT 
-        DATE_FORMAT(created_at, '%Y-%m') as month,
+    SELECT
+        TO_CHAR(created_at, 'YYYY-MM') as month,
         COUNT(*) as order_count,
         SUM(final_amount) as total_sales
-    FROM orders 
-    WHERE payment_status = 'paid' 
-    AND created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
-    GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+    FROM orders
+    WHERE payment_status = 'paid'
+    AND created_at >= NOW() - INTERVAL '6 months'
+    GROUP BY TO_CHAR(created_at, 'YYYY-MM')
     ORDER BY month DESC
 ");
 $monthlySales = $stmt->fetchAll();
@@ -58,8 +58,7 @@ $orderStatusBreakdown = $stmt->fetchAll();
 $stmt = $conn->query("
     SELECT COUNT(*) as count 
     FROM orders 
-    WHERE MONTH(created_at) = MONTH(CURRENT_DATE()) 
-    AND YEAR(created_at) = YEAR(CURRENT_DATE())
+    WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
 ");
 $ordersThisMonth = $stmt->fetch()['count'];
 ?>

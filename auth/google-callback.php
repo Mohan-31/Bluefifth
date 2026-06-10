@@ -1,11 +1,5 @@
 <?php
-// Google OAuth has been replaced by phone-OTP checkout. This file is disabled.
-http_response_code(410);
-header('Content-Type: application/json');
-echo json_encode(['success' => false, 'message' => 'Google Sign-In is no longer supported. Please use phone verification at checkout.']);
-exit;
-
-// auth/google-callback.php - COMPLETE Enhanced with Welcome Email System
+// auth/google-callback.php — Google One Tap authentication handler
 session_start();
 
 // Set error reporting
@@ -108,15 +102,15 @@ try {
         // New user
         $isNewUser = true;
         
-        $stmt = $conn->prepare("INSERT INTO users (google_id, email, name, profile_image, last_login, welcome_email_sent) VALUES (?, ?, ?, ?, NOW(), 1)");
+        $stmt = $conn->prepare("INSERT INTO users (google_id, email, name, profile_image, last_login, welcome_email_sent) VALUES (?, ?, ?, ?, NOW(), TRUE) RETURNING id");
         $stmt->execute([
             $user_info['sub'],
             $user_info['email'],
             $user_info['name'],
             $user_info['picture'] ?? null
         ]);
-        
-        $userId = $conn->lastInsertId();
+
+        $userId = (int)$stmt->fetchColumn();
         
         // Create referral code
         $code = generateReferralCode();

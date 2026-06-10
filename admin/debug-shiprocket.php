@@ -61,7 +61,7 @@ if (empty($email) || empty($password)) {
 echo "\n4. CHECKING ORDERS TABLE:\n";
 try {
     $conn = getConnection();
-    $stmt = $conn->query("DESCRIBE orders");
+    $stmt = $conn->query("SELECT column_name FROM information_schema.columns WHERE table_name = 'orders' AND table_schema = 'public'");
     $columns = $stmt->fetchAll(PDO::FETCH_COLUMN);
     
     $shiprocketColumns = ['shiprocket_shipment_id', 'shiprocket_order_id', 'tracking_number', 'courier_partner'];

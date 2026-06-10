@@ -12,7 +12,7 @@ $isLoggedIn  = $isLoggedIn && ($currentUser !== null);
 $categories = getAllCategories();
 
 // Get user's cart summary if logged in
-$cartSummary  = $isLoggedIn ? getCartSummary($currentUser['id'])   : ['item_count' => 0];
+$cartSummary  = $isLoggedIn ? getCartSummary($currentUser['id'])   : getSessionCartSummary();
 $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' => 0, 'pending_points' => 0];
 
 // Set site name for navbar
@@ -1125,7 +1125,7 @@ let isLoggedIn = <?= $isLoggedIn ? 'true' : 'false' ?>;
         if (currentUser) return;
         
         if (!googleInitialized && !initializeGoogle()) {
-            alert('Authentication system not ready. Please refresh the page and try again.');
+            if (window.showToast) showToast('Authentication system not ready. Please refresh the page.', 'warning');
             window.location.reload();
             return;
         }
@@ -1133,13 +1133,13 @@ let isLoggedIn = <?= $isLoggedIn ? 'true' : 'false' ?>;
         try {
             google.accounts.id.prompt((notification) => {
                 if (notification.isNotDisplayed()) {
-                    alert('Login not available at the moment. Please refresh the page and try again.');
+                    if (window.showToast) showToast('Login not available right now. Please refresh the page.', 'warning');
                     window.location.reload();
                 }
             });
         } catch (error) {
             console.error('One-Tap login error:', error);
-            alert('Login system error. Please refresh the page and try again.');
+            if (window.showToast) showToast('Login system error. Please refresh the page.', 'error');
             window.location.reload();
         }
     };
@@ -1944,18 +1944,6 @@ console.log('🎉 Complete integrated authentication and shopping system loaded'
             }
         }
 
-        // Search functionality
-        function toggleSearch() {
-            $('#searchModal').modal('show');
-            setTimeout(() => document.getElementById('searchInput').focus(), 500);
-        }
-
-        function handleSearchKeypress(event) {
-            if (event.key === 'Enter') {
-                performSearch();
-            }
-        }
-
         // Sorting and filtering functions
         function applySorting() {
             const sortValue = document.getElementById('sortSelect').value;
@@ -2034,100 +2022,6 @@ console.log('🎉 Complete integrated authentication and shopping system loaded'
         // ============================================================================
         // MISSING SEARCH FUNCTIONS - ADD THESE
         // ============================================================================
-
-        // Search functionality
-        function toggleSearch() {
-            $('#searchModal').modal('show');
-            setTimeout(() => {
-                const searchInput = document.getElementById('searchInput');
-                if (searchInput) {
-                    searchInput.focus();
-                }
-            }, 500);
-        }
-
-        async function performSearch() {
-            const searchInput = document.getElementById('searchInput');
-            if (!searchInput) {
-                console.error('Search input not found');
-                return;
-            }
-            
-            const searchTerm = searchInput.value.trim();
-            
-            if (searchTerm.length < 2) {
-                showNotification('Please enter at least 2 characters', 'warning');
-                return;
-            }
-
-            try {
-                console.log('🔍 Category search - using ../shop/api/search.php');
-                console.log('🔍 Search term:', searchTerm);
-                
-                const response = await fetch(`../shop/api/search.php?q=${encodeURIComponent(searchTerm)}`);
-                console.log('🔍 Response status:', response.status);
-                console.log('🔍 Response URL:', response.url);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                const data = await response.json();
-                console.log('🔍 Search data:', data);
-
-                if (data.success && data.products) {
-                    displaySearchResults(data.products);
-                } else {
-                    document.getElementById('searchResults').innerHTML = '<p class="text-muted">No products found.</p>';
-                }
-            } catch (error) {
-                console.error('Search error:', error);
-                document.getElementById('searchResults').innerHTML = `
-                    <div class="alert alert-danger">
-                        <strong>Search Error:</strong> ${error.message}<br>
-                        <small>URL: ${window.location.href}</small><br>
-                        <small>Tried: ../shop/api/search.php</small>
-                    </div>
-                `;
-            }
-        }
-
-        function displaySearchResults(products) {
-            const resultsContainer = document.getElementById('searchResults');
-            
-            if (!resultsContainer) {
-                console.error('Search results container not found');
-                return;
-            }
-            
-            if (products.length === 0) {
-                resultsContainer.innerHTML = '<p class="text-muted">No products found.</p>';
-                return;
-            }
-
-            let html = '<div class="row">';
-            products.forEach(product => {
-                html += `
-                    <div class="col-md-4 mb-3">
-                        <div class="card">
-                            <img src="${product.primary_image || '../assets/images/default-product.jpg'}" 
-                                class="card-img-top" style="height: 200px; object-fit: cover;" 
-                                alt="${product.name}"
-                                onerror="this.src='../assets/images/default-product.jpg'">
-                            <div class="card-body">
-                                <h6 class="card-title">${product.name}</h6>
-                                <p class="card-text">₹${parseFloat(product.price).toFixed(2)}</p>
-                                <a href="product.php?id=${product.id}" class="btn btn-primary btn-sm">View Product</a>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-            html += '</div>';
-            
-            resultsContainer.innerHTML = html;
-            console.log('🔍 Search results displayed:', products.length, 'products');
-        }
 
         // Update cart count in navigation
         function updateCartCount(count) {

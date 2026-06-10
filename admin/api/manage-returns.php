@@ -75,13 +75,13 @@ function handleGetReturns($conn) {
     if (!empty($_GET['date_range'])) {
         switch ($_GET['date_range']) {
             case 'today':
-                $whereConditions[] = "DATE(r.created_at) = CURDATE()";
+                $whereConditions[] = "DATE(r.created_at) = CURRENT_DATE";
                 break;
             case 'week':
-                $whereConditions[] = "r.created_at >= DATE_SUB(NOW(), INTERVAL 1 WEEK)";
+                $whereConditions[] = "r.created_at >= NOW() - INTERVAL '1 week'";
                 break;
             case 'month':
-                $whereConditions[] = "r.created_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH)";
+                $whereConditions[] = "r.created_at >= NOW() - INTERVAL '1 month'";
                 break;
         }
     }
@@ -452,7 +452,7 @@ function handleExportReturns($conn) {
             r.return_reason as 'Return Reason',
             r.return_status as 'Status',
             r.return_awb as 'AWB Code',
-            DATE_FORMAT(r.created_at, '%Y-%m-%d %H:%i:%s') as 'Created Date'
+            TO_CHAR(r.created_at, 'YYYY-MM-DD HH24:MI:SS') as "Created Date"
         FROM order_returns r
         LEFT JOIN orders o ON r.order_id = o.id
         LEFT JOIN users u ON o.user_id = u.id

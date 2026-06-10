@@ -72,7 +72,7 @@ function getCoupons($conn) {
     $params = [];
     
     if (!empty($search)) {
-        $whereClauses[] = "(code LIKE ? OR description LIKE ?)";
+        $whereClauses[] = "(code ILIKE ? OR description ILIKE ?)";
         $searchTerm = "%{$search}%";
         $params[] = $searchTerm;
         $params[] = $searchTerm;
@@ -80,9 +80,9 @@ function getCoupons($conn) {
     
     if (!empty($status)) {
         if ($status === 'active') {
-            $whereClauses[] = "is_active = 1 AND (expires_at IS NULL OR expires_at > NOW())";
+            $whereClauses[] = "is_active = TRUE AND (expires_at IS NULL OR expires_at > NOW())";
         } elseif ($status === 'inactive') {
-            $whereClauses[] = "is_active = 0";
+            $whereClauses[] = "is_active = FALSE";
         } elseif ($status === 'expired') {
             $whereClauses[] = "expires_at IS NOT NULL AND expires_at <= NOW()";
         }
@@ -265,7 +265,7 @@ function getCouponStats($conn) {
     $totalCoupons = $totalStmt->fetchColumn();
     
     // Active coupons
-    $activeStmt = $conn->prepare("SELECT COUNT(*) FROM coupons WHERE is_active = 1 AND (expires_at IS NULL OR expires_at > NOW())");
+    $activeStmt = $conn->prepare("SELECT COUNT(*) FROM coupons WHERE is_active = TRUE AND (expires_at IS NULL OR expires_at > NOW())");
     $activeStmt->execute();
     $activeCoupons = $activeStmt->fetchColumn();
     
@@ -353,7 +353,7 @@ function exportCoupons($conn) {
     $params = [];
     
     if (!empty($search)) {
-        $whereClauses[] = "(code LIKE ? OR description LIKE ?)";
+        $whereClauses[] = "(code ILIKE ? OR description ILIKE ?)";
         $searchTerm = "%{$search}%";
         $params[] = $searchTerm;
         $params[] = $searchTerm;
@@ -361,9 +361,9 @@ function exportCoupons($conn) {
     
     if (!empty($status)) {
         if ($status === 'active') {
-            $whereClauses[] = "is_active = 1 AND (expires_at IS NULL OR expires_at > NOW())";
+            $whereClauses[] = "is_active = TRUE AND (expires_at IS NULL OR expires_at > NOW())";
         } elseif ($status === 'inactive') {
-            $whereClauses[] = "is_active = 0";
+            $whereClauses[] = "is_active = FALSE";
         } elseif ($status === 'expired') {
             $whereClauses[] = "expires_at IS NOT NULL AND expires_at <= NOW()";
         }

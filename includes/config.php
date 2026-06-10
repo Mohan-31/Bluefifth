@@ -35,13 +35,14 @@ define('SITE_URL',   BASE_URL);
 define('ADMIN_EMAIL', getenv('ADMIN_EMAIL') ?: 'immohan017@gmail.com');
 
 // ============================================================
-// GOOGLE OAUTH — DEPRECATED
-// Google OAuth has been replaced by phone-OTP checkout.
-// These constants are kept for reference only and are not used.
+// GOOGLE OAUTH
 // ============================================================
-// define('GOOGLE_CLIENT_ID',     '...');
-// define('GOOGLE_CLIENT_SECRET', '...');
-// define('GOOGLE_REDIRECT_URI',  BASE_URL . '/auth/google-callback.php');
+define('GOOGLE_CLIENT_ID',
+    getenv('GOOGLE_CLIENT_ID') ?: '340757900430-i8nl6l45ndveq9jmbvbah7ugquauj803.apps.googleusercontent.com'
+);
+define('GOOGLE_CLIENT_SECRET',
+    getenv('GOOGLE_CLIENT_SECRET') ?: ''
+);
 
 // ============================================================
 // RAZORPAY MAGIC CHECKOUT
