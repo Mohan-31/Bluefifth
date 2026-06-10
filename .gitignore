@@ -1,5 +1,7 @@
 # ── Secrets — NEVER commit these ─────────────────────────────
 .env
+.env.production
+.env.local
 *.env.local
 
 # ── Uploads (user content) ───────────────────────────────────
@@ -18,3 +20,5 @@ desktop.ini
 .idea/
 .vscode/
 *.swp
+
+.vercel

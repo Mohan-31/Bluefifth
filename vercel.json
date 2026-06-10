@@ -1,16 +1,27 @@
 {
-  "functions": {
-    "**/*.php": {
-      "runtime": "vercel-php@0.7.2"
-    }
-  },
-  "rewrites": [
-    { "source": "/", "destination": "/index.php" },
-    { "source": "/shop/(.*)", "destination": "/shop/$1" },
-    { "source": "/admin/(.*)", "destination": "/admin/$1" },
-    { "source": "/auth/(.*)", "destination": "/auth/$1" },
-    { "source": "/account/(.*)", "destination": "/account/$1" },
-    { "source": "/includes/(.*)", "destination": "/includes/$1" },
-    { "source": "/webhooks/(.*)", "destination": "/webhooks/$1" }
+  "version": 2,
+  "builds": [
+    { "src": "**/*.php", "use": "vercel-php@0.7.2" }
+  ],
+  "routes": [
+    { "src": "/",                  "dest": "/index.php" },
+    { "src": "/checkout",          "dest": "/checkout.php" },
+    { "src": "/checkout.php",      "dest": "/checkout.php" },
+    { "src": "/track",             "dest": "/track.php" },
+    { "src": "/track.php",         "dest": "/track.php" },
+    { "src": "/profile",           "dest": "/profile.php" },
+    { "src": "/profile.php",       "dest": "/profile.php" },
+    { "src": "/invoice",           "dest": "/invoice.php" },
+    { "src": "/invoice.php",       "dest": "/invoice.php" },
+    { "src": "/shop/(.*)",         "dest": "/shop/$1" },
+    { "src": "/admin/(.*)",        "dest": "/admin/$1" },
+    { "src": "/auth/(.*)",         "dest": "/auth/$1" },
+    { "src": "/account/(.*)",      "dest": "/account/$1" },
+    { "src": "/referral/(.*)",     "dest": "/referral/$1" },
+    { "src": "/wallet/(.*)",       "dest": "/wallet/$1" },
+    { "src": "/includes/(.*)",     "dest": "/includes/$1" },
+    { "src": "/webhooks/(.*)",     "dest": "/webhooks/$1" },
+    { "src": "/assets/(.*)",       "dest": "/assets/$1" },
+    { "src": "/js/(.*)",           "dest": "/js/$1" }
   ]
 }
