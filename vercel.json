@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "nodeVersion": "20.x",
   "builds": [
     { "src": "**/*.php", "use": "vercel-php@0.9.0" }
   ],
