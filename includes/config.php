@@ -29,7 +29,7 @@ define('BASE_URL', getenv('BASE_URL') ?: 'http://localhost/ecommerce-project');
 // BASE_PATH: URL-path prefix for all internal links.
 // Vercel (domain root): set BASE_PATH=  (empty) or BASE_PATH=/
 // XAMPP local:          leave unset → defaults to /ecommerce-project
-define('BASE_PATH', rtrim(getenv('BASE_PATH') !== false ? (string)getenv('BASE_PATH') : '/ecommerce-project', '/'));
+define('BASE_PATH', rtrim(getenv('BASE_PATH') !== false ? (string)getenv('BASE_PATH') : '', '/'));
 define('SITE_NAME', 'bluefifth');
 define('SITE_URL',   BASE_URL);
 define('ADMIN_EMAIL', getenv('ADMIN_EMAIL') ?: 'immohan017@gmail.com');
@@ -76,5 +76,5 @@ define('SHIPROCKET_RETURN_WEBHOOK_TOKEN', getenv('SHIPROCKET_RETURN_WEBHOOK_TOKE
 // UPLOAD PATHS
 // ============================================================
 
-define('UPLOAD_BASE_PATH', $_SERVER['DOCUMENT_ROOT'] . '/ecommerce-project/uploads');
+define('UPLOAD_BASE_PATH', rtrim($_SERVER['DOCUMENT_ROOT'], '/') . (BASE_PATH ? BASE_PATH : '') . '/uploads');
 define('UPLOAD_BASE_URL',  BASE_URL . '/uploads');

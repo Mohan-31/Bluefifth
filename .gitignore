@@ -5,7 +5,11 @@
 *.env.local
 
 # ── Uploads (user content) ───────────────────────────────────
-uploads/
+# Product + category images are committed for Vercel deployment.
+# Sensitive user documents are excluded.
+uploads/ids/
+uploads/kyc/
+uploads/returns/
 
 # ── PHP / Server logs ─────────────────────────────────────────
 *.log
