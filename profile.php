@@ -591,9 +591,9 @@ if (isset($_POST['save_profile'])) {
 </head>
 <body>
     
-<?php include './includes/timer.php'; ?>
+<?php include __DIR__ . '/includes/timer.php'; ?>
 
-<?php include './includes/navbar.php'; ?>
+<?php include __DIR__ . '/includes/navbar.php'; ?>
 
 <div class="container mt-5">
   <!-- Header -->

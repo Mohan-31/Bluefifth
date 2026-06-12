@@ -559,9 +559,9 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
 </head>
 <body>
 
-<?php include './includes/timer.php'; ?>
+<?php include __DIR__ . '/includes/timer.php'; ?>
 
-<?php include './includes/navbar.php'; ?>
+<?php include __DIR__ . '/includes/navbar.php'; ?>
 
 <!-- Referral Alert (if user came via referral) -->
 <?php if ($referralCode): ?>

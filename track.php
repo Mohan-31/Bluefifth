@@ -178,7 +178,7 @@ $currentStep = $order ? statusToStep($order['status']) : 0;
   </style>
 </head>
 <body>
-<?php include './includes/navbar.php'; ?>
+<?php include __DIR__ . '/includes/navbar.php'; ?>
 
 <div class="track-wrap nav-align">
 
