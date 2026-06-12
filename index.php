@@ -1,5 +1,4 @@
-﻿<?php
-// index.php - UNIFIED Shopping + Referral System with Fixed Navigation
+<?php
 session_start();
 require_once 'includes/database.php';
 require_once 'includes/functions.php';

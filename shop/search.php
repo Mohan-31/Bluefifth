@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // shop/search.php - Complete Dynamic Product Search Results Page
 session_start();
 require_once '../includes/database.php';

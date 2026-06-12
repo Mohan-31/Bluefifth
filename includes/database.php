@@ -1,4 +1,7 @@
 <?php
+// Vercel serverless: force CWD to project root so all ./includes/ paths resolve correctly
+chdir(dirname(__DIR__));
+
 // Load .env before anything else so DATABASE_URL is available
 // regardless of which file included us first.
 (static function () {
