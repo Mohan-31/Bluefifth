@@ -1,9 +1,9 @@
 <?php
 // shop/search.php - Complete Dynamic Product Search Results Page
 session_start();
-require_once '../includes/database.php';
-require_once '../includes/functions.php';
-require_once '../auth/session.php';
+require_once __DIR__ . '/../includes/database.php';
+require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../auth/session.php';
 
 // Get search parameters
 $searchQuery = trim($_GET['q'] ?? '');
@@ -505,7 +505,7 @@ $seoDescription = "Search results for '" . htmlspecialchars($searchQuery) . "' -
     </style>
 </head>
 <body>
-    <?php include '../includes/navbar.php'; ?>
+    <?php include __DIR__ . '/../includes/navbar.php'; ?>
 
 <!-- Search Header -->
     <div class="search-header nav-align">

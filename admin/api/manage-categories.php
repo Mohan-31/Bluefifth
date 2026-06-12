@@ -8,9 +8,9 @@ header('Content-Type: application/json; charset=utf-8');
 
 // admin/api/manage-categories.php - COMPLETE Category Management API
 session_start();
-require_once '../../includes/database.php';
-require_once '../../includes/functions.php';
-require_once '../admin-session.php';
+require_once __DIR__ . '/../../includes/database.php';
+require_once __DIR__ . '/../../includes/functions.php';
+require_once __DIR__ . '/../admin-session.php';
 
 // Add this after the require_once statements  
 global $pdo;

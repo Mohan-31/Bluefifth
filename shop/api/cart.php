@@ -2,9 +2,9 @@
 // shop/api/cart.php - Complete Cart API for both authenticated and guest users
 ob_start(); // buffer any stray PHP notices so they don't corrupt the JSON response
 session_start();
-require_once '../../includes/database.php';
-require_once '../../includes/functions.php';
-require_once '../../auth/session.php';
+require_once __DIR__ . '/../../includes/database.php';
+require_once __DIR__ . '/../../includes/functions.php';
+require_once __DIR__ . '/../../auth/session.php';
 
 // Set JSON content type
 header('Content-Type: application/json');

@@ -1,8 +1,8 @@
 <?php
 // admin/settings.php - Complete System Settings Interface with ALL ORIGINAL FEATURES PRESERVED
 session_start();
-require_once '../includes/database.php';
-require_once '../includes/functions.php';
+require_once __DIR__ . '/../includes/database.php';
+require_once __DIR__ . '/../includes/functions.php';
 // NO authentication check - admin.php already handled it
 require_once 'admin-session.php';
 // ONLY authentication check - Gateway control

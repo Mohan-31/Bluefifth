@@ -1,9 +1,9 @@
 <?php
-require_once '../includes/database.php';
-require_once '../includes/functions.php';
-require_once '../auth/session.php';
-require_once '../includes/config.php';
-require_once '../includes/email-templates.php';
+require_once __DIR__ . '/../includes/database.php';
+require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../auth/session.php';
+require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/email-templates.php';
 
 // This file handles adding points to a user's wallet
 // It can be called directly by the referral system or via API

@@ -1,8 +1,8 @@
 <?php
 // account/orders.php - Customer Orders with Shiprocket Tracking Integration - FIXED VERSION
 session_start();
-require_once '../includes/database.php';
-require_once '../includes/functions.php';
+require_once __DIR__ . '/../includes/database.php';
+require_once __DIR__ . '/../includes/functions.php';
 
 // Check if user is logged in
 $isLoggedIn = isset($_SESSION['user_id']);
@@ -1286,7 +1286,7 @@ $categories    = getAllCategories();
 $cartSummary   = $isLoggedIn ? getCartSummary($userId)   : getSessionCartSummary();
 $walletBalance = $isLoggedIn ? getWalletBalance($userId) : ['points' => 0, 'pending_points' => 0];
 ?>
-<?php include '../includes/navbar.php'; ?>
+<?php include __DIR__ . '/../includes/navbar.php'; ?>
 
     <div class="container orders-container p-3 nav-align">
         <!-- Page Header -->

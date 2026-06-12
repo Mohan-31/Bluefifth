@@ -6,8 +6,8 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // Clear the user's DB cart on logout so next login starts fresh
 if (isset($_SESSION['user_id'])) {
-    require_once '../includes/database.php';
-    require_once '../includes/functions.php';
+    require_once __DIR__ . '/../includes/database.php';
+    require_once __DIR__ . '/../includes/functions.php';
 
     $userId = $_SESSION['user_id'];
 

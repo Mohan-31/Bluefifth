@@ -11,7 +11,7 @@ header('Content-Type: application/json');
 ob_start();
 
 try {
-    require_once '../admin-session.php';
+    require_once __DIR__ . '/../admin-session.php';
 
     // Check admin authentication
     checkAdminAuth();
@@ -203,7 +203,7 @@ function sendApprovalEmail($userEmail, $userName, $amount, $breakdown) {
             return false;
         }
         
-        $emailConfig = include '../../includes/email-config.php';
+        $emailConfig = include __DIR__ . '/../../includes/email-config.php';
         
         if (!$emailConfig['settings']['enabled'] || 
             empty($emailConfig['sendinblue']['api_key']) || 
@@ -231,7 +231,7 @@ function sendRejectionEmail($userEmail, $userName, $claimId, $amount, $reason) {
             return false;
         }
         
-        $emailConfig = include '../../includes/email-config.php';
+        $emailConfig = include __DIR__ . '/../../includes/email-config.php';
         
         if (!$emailConfig['settings']['enabled'] || 
             empty($emailConfig['sendinblue']['api_key']) || 

@@ -5,10 +5,10 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-require_once '../includes/database.php';
-require_once '../includes/functions.php';
-require_once '../auth/session.php';
-require_once '../includes/referral-tracker.php';
+require_once __DIR__ . '/../includes/database.php';
+require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../auth/session.php';
+require_once __DIR__ . '/../includes/referral-tracker.php';
 
 // Check if user is logged in
 $isLoggedIn = isLoggedIn();
@@ -663,9 +663,9 @@ $finalTotal = $totalAmount + $shippingCost;
     </style>
 </head>
 <body>
-    <?php include '../includes/timer.php'; ?>
+    <?php include __DIR__ . '/../includes/timer.php'; ?>
     <!-- Navigation -->
-    <?php include '../includes/navbar.php'; ?>
+    <?php include __DIR__ . '/../includes/navbar.php'; ?>
 
     <div class="container cart-container nav-align">
         <!-- Breadcrumb -->

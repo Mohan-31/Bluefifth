@@ -1,7 +1,7 @@
 <?php
-require_once '../includes/database.php';
-require_once '../includes/functions.php';
-require_once '../auth/session.php';
+require_once __DIR__ . '/../includes/database.php';
+require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../auth/session.php';
 
 // Check if user is logged in
 if (!isLoggedIn()) {

@@ -1,8 +1,8 @@
 <?php
 // admin/api/manage-returns.php - Returns Management API
 session_start();
-require_once '../../includes/database.php';
-require_once '../../includes/functions.php';
+require_once __DIR__ . '/../../includes/database.php';
+require_once __DIR__ . '/../../includes/functions.php';
 
 header('Content-Type: application/json');
 

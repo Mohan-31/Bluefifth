@@ -1,8 +1,8 @@
 <?php
 // Create this file as: admin/test-shiprocket.php
 session_start();
-require_once '../includes/database.php';
-require_once '../includes/functions.php';
+require_once __DIR__ . '/../includes/database.php';
+require_once __DIR__ . '/../includes/functions.php';
 
 // Simple test to check Shiprocket integration
 ?>

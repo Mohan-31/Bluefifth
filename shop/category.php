@@ -1,10 +1,10 @@
 <?php
 // shop/category.php - Complete Dynamic Category Listing Page
 session_start();
-require_once '../includes/database.php';
-require_once '../includes/functions.php';
-require_once '../auth/session.php';
-require_once '../includes/referral-tracker.php';
+require_once __DIR__ . '/../includes/database.php';
+require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../auth/session.php';
+require_once __DIR__ . '/../includes/referral-tracker.php';
 
 
 
@@ -14,7 +14,7 @@ if (getSetting('maintenance_mode') === 'true') {
     
     if (!$isAdmin) {
         // Show maintenance page to non-admin users
-        include '../static/maintenance.html';
+        include __DIR__ . '/../static/maintenance.html';
         exit;
     }
 }
@@ -480,9 +480,9 @@ $seoMeta = getCategorySEOMeta($category);
 </head>
 <body>
     
-    <?php include '../includes/timer.php'; ?>
+    <?php include __DIR__ . '/../includes/timer.php'; ?>
     <!-- NAVIGATION -->
-    <?php include '../includes/navbar.php'; ?>
+    <?php include __DIR__ . '/../includes/navbar.php'; ?>
       
     <!-- BANNER -->
     <div class="container-fluid banner-category-bg nav-align">

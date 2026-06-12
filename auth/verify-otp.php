@@ -1,8 +1,8 @@
 <?php
 session_start();
 header('Content-Type: application/json');
-require_once '../includes/database.php';
-require_once '../includes/functions.php';
+require_once __DIR__ . '/../includes/database.php';
+require_once __DIR__ . '/../includes/functions.php';
 require_once 'session.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

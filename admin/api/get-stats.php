@@ -1,8 +1,8 @@
 <?php
 // admin/api/get-stats.php - Backend API only, returns JSON data
-require_once '../../includes/database.php';
-require_once '../../includes/functions.php';
-require_once '../admin-session.php';
+require_once __DIR__ . '/../../includes/database.php';
+require_once __DIR__ . '/../../includes/functions.php';
+require_once __DIR__ . '/../admin-session.php';
 
 // Set JSON header
 header('Content-Type: application/json');

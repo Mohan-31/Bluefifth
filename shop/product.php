@@ -1,10 +1,10 @@
 <?php
 // shop/product.php - Dynamic Product Detail Page (FIXED & SYNCHRONIZED)
 session_start();
-require_once '../includes/database.php';
-require_once '../includes/functions.php';
-require_once '../auth/session.php';
-require_once '../includes/referral-tracker.php';
+require_once __DIR__ . '/../includes/database.php';
+require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../auth/session.php';
+require_once __DIR__ . '/../includes/referral-tracker.php';
 
 // Check maintenance mode (but allow admins)
 if (getSetting('maintenance_mode') === 'true') {
@@ -12,7 +12,7 @@ if (getSetting('maintenance_mode') === 'true') {
     
     if (!$isAdmin) {
         // Show maintenance page to non-admin users
-        include '../static/maintenance.html';
+        include __DIR__ . '/../static/maintenance.html';
         exit;
     }
 }
@@ -930,9 +930,9 @@ $productReviews = getProductReviews($productId);
     </style>
 </head>
 <body>
-    <?php include '../includes/timer.php'; ?>
+    <?php include __DIR__ . '/../includes/timer.php'; ?>
     <!-- Navigation -->
-    <?php include '../includes/navbar.php'; ?>
+    <?php include __DIR__ . '/../includes/navbar.php'; ?>
 
     <!-- Breadcrumb Navigation -->
     <div class="container nav-align">

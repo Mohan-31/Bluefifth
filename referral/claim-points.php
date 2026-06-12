@@ -107,8 +107,8 @@ function computeTdsForClaim($conn, $userId, $claimAmount) {
 
 try {
     // Include your actual files
-    require_once '../includes/database.php';
-    require_once '../auth/session.php';
+    require_once __DIR__ . '/../includes/database.php';
+    require_once __DIR__ . '/../auth/session.php';
     
     // Check if user is logged in
     if (!isLoggedIn()) {
@@ -200,8 +200,8 @@ try {
         $emailSent = false;
         try {
             if (file_exists('../includes/sendinblue-mailer.php') && file_exists('../includes/email-config.php')) {
-                require_once '../includes/sendinblue-mailer.php';
-                $emailConfig = include '../includes/email-config.php';
+                require_once __DIR__ . '/../includes/sendinblue-mailer.php';
+                $emailConfig = include __DIR__ . '/../includes/email-config.php';
                 
                 if ($emailConfig['settings']['enabled'] && 
                     !empty($emailConfig['sendinblue']['api_key']) && 
@@ -245,8 +245,8 @@ try {
         $emailSent = false;
         try {
             if (file_exists('../includes/sendinblue-mailer.php') && file_exists('../includes/email-config.php')) {
-                require_once '../includes/sendinblue-mailer.php';
-                $emailConfig = include '../includes/email-config.php';
+                require_once __DIR__ . '/../includes/sendinblue-mailer.php';
+                $emailConfig = include __DIR__ . '/../includes/email-config.php';
                 
                 if ($emailConfig['settings']['enabled'] && 
                     !empty($emailConfig['sendinblue']['api_key']) && 
@@ -367,8 +367,8 @@ try {
         $emailSent = false;
         try {
             if (file_exists('../includes/sendinblue-mailer.php') && file_exists('../includes/email-config.php')) {
-                require_once '../includes/sendinblue-mailer.php';
-                $emailConfig = include '../includes/email-config.php';
+                require_once __DIR__ . '/../includes/sendinblue-mailer.php';
+                $emailConfig = include __DIR__ . '/../includes/email-config.php';
                 
                 if ($emailConfig['settings']['enabled'] && 
                     !empty($emailConfig['sendinblue']['api_key']) && 

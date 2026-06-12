@@ -11,9 +11,9 @@ header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 // admin/api/manage-products.php - BULLETPROOF Product Management API
 session_start();
-require_once '../../includes/database.php';
-require_once '../../includes/functions.php';
-require_once '../admin-session.php';
+require_once __DIR__ . '/../../includes/database.php';
+require_once __DIR__ . '/../../includes/functions.php';
+require_once __DIR__ . '/../admin-session.php';
 
 // Handle preflight requests
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {

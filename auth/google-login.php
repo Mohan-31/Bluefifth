@@ -5,7 +5,7 @@ header('Content-Type: application/json');
 echo json_encode(['success' => false, 'message' => 'Google Sign-In is no longer supported. Please use phone verification at checkout.']);
 exit;
 
-require_once '../includes/config.php';
+require_once __DIR__ . '/../includes/config.php';
 
 // Redirect to Google OAuth page
 $params = array(

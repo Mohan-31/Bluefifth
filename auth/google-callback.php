@@ -7,10 +7,10 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 // Include files
-require_once '../includes/config.php';
-require_once '../includes/database.php';
-require_once '../includes/functions.php';
-require_once '../includes/sendinblue-mailer.php';
+require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/database.php';
+require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/sendinblue-mailer.php';
 require_once 'session.php';
 
 // Set content type
@@ -171,7 +171,7 @@ try {
 function sendWelcomeEmail($userId, $userName, $userEmail, $referralCode = null, $referralLink = null) {
     try {
         // Load email configuration
-        $emailConfig = include '../includes/email-config.php';
+        $emailConfig = include __DIR__ . '/../includes/email-config.php';
         
         if (!$emailConfig['settings']['enabled']) {
             return false;

@@ -2,10 +2,10 @@
 // track-purchase.php - FIXED TO USE UNIFIED REFERRAL SYSTEM
 header('Content-Type: application/json');
 
-require_once '../includes/database.php';
-require_once '../includes/functions.php';
-require_once '../auth/session.php';
-require_once '../includes/config.php';
+require_once __DIR__ . '/../includes/database.php';
+require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../auth/session.php';
+require_once __DIR__ . '/../includes/config.php';
 
 // Check if request has required parameters
 if (!isset($_POST['order_id']) || !isset($_POST['order_amount'])) {

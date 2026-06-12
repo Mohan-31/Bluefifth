@@ -1,9 +1,9 @@
 <?php
 // shop/api/search.php - Complete Search API for product search functionality
 session_start();
-require_once '../../includes/database.php';
-require_once '../../includes/functions.php';
-require_once '../../auth/session.php';
+require_once __DIR__ . '/../../includes/database.php';
+require_once __DIR__ . '/../../includes/functions.php';
+require_once __DIR__ . '/../../auth/session.php';
 
 // Set JSON content type
 header('Content-Type: application/json');

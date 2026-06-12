@@ -1,5 +1,5 @@
 <?php
-require_once '../../includes/database.php';
+require_once __DIR__ . '/../../includes/database.php';
 
 if (isset($_POST['timer_message'])) {
     $timerMessage = trim($_POST['timer_message']);
