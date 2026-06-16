@@ -10,6 +10,17 @@ require_once __DIR__ . '/config.php';
 // ============================================================================
 
 /**
+ * Strip any legacy BASE_PATH prefix from stored image URLs.
+ * Old XAMPP uploads stored paths like /ecommerce-project/uploads/...
+ * Vercel serves them at /uploads/... (root).
+ */
+function normalizeImagePath($path) {
+    if (empty($path)) return $path;
+    // Remove any leading directory prefix before /uploads/ or /assets/
+    return preg_replace('#^/[^/]+(/(?:uploads|assets)/)#', '$1', $path);
+}
+
+/**
  * Normalize sizes from DB (JSONB) to a flat array of size strings.
  * Handles both [{size:'S',stock:10},...] and ['S','M',...] formats.
  */
@@ -2294,9 +2305,14 @@ function getFeaturedProducts($limit = 8) {
             $additionalProducts = $stmt->fetchAll();
             $products = array_merge($products, $additionalProducts);
         }
-        
+
+        foreach ($products as &$p) {
+            if (!empty($p['primary_image'])) {
+                $p['primary_image'] = normalizeImagePath($p['primary_image']);
+            }
+        }
         return $products;
-        
+
     } catch (Exception $e) {
         error_log("Database error in getFeaturedProducts: " . $e->getMessage());
         return [];
@@ -3577,9 +3593,15 @@ function getProductsForCategory($categorySlug, $page = 1, $limit = 12, $sort = '
         if (!empty($sort) && !empty($products)) {
             $products = sortProductsArray($products, $sort);
         }
-        
+
+        foreach ($products as &$p) {
+            if (!empty($p['primary_image'])) {
+                $p['primary_image'] = normalizeImagePath($p['primary_image']);
+            }
+        }
+
         $totalPages = ceil($totalProducts / $limit);
-        
+
         return [
             'products' => $products,
             'total' => $totalProducts,
@@ -3634,9 +3656,15 @@ function getAllCategories($status = 'active') {
         
         $stmt = $conn->prepare($sql);
         $stmt->execute($params);
-        
-        return $stmt->fetchAll();
-        
+
+        $categories = $stmt->fetchAll();
+        foreach ($categories as &$cat) {
+            if (!empty($cat['image'])) {
+                $cat['image'] = normalizeImagePath($cat['image']);
+            }
+        }
+        return $categories;
+
     } catch (Exception $e) {
         error_log("Database error in getAllCategories: " . $e->getMessage());
         return [];
@@ -5340,20 +5368,39 @@ function processClaim($claimDbId, $action, $reason = '') {
  */
 function getSetting($key, $default = null) {
     global $conn;
-    
+    static $cache = [];
+
+    if (array_key_exists($key, $cache)) {
+        return $cache[$key] ?? $default;
+    }
+
+    // Warm the entire settings table on first miss so subsequent calls are free
+    if (empty($cache)) {
+        try {
+            if (!$conn) {
+                $conn = getConnection();
+            }
+            $rows = $conn->query("SELECT setting_key, setting_value FROM settings")->fetchAll(PDO::FETCH_KEY_PAIR);
+            $cache = $rows ?: [];
+        } catch (Exception $e) {
+            error_log("Error warming settings cache: " . $e->getMessage());
+        }
+    }
+
+    if (array_key_exists($key, $cache)) {
+        return $cache[$key] ?? $default;
+    }
+
+    // Key not in table at all — fetch individually and cache the miss
     try {
         if (!$conn) {
             $conn = getConnection();
         }
-        
         $stmt = $conn->prepare("SELECT setting_value FROM settings WHERE setting_key = ?");
         $stmt->execute([$key]);
-        
-        if ($stmt->rowCount() > 0) {
-            return $stmt->fetchColumn();
-        }
-        
-        return $default;
+        $val = $stmt->fetchColumn();
+        $cache[$key] = ($val !== false) ? $val : null;
+        return $cache[$key] ?? $default;
     } catch (Exception $e) {
         error_log("Error getting setting: " . $e->getMessage());
         return $default;

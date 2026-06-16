@@ -10,17 +10,6 @@ require_once 'auth/session.php';
 // ========================================
 checkMaintenanceModeAndRedirect();
 
-// Check maintenance mode (but allow admins)
-if (getSetting('maintenance_mode') === 'true') {
-    $isAdmin = isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true;
-    
-    if (!$isAdmin) {
-        // Show maintenance page to non-admin users
-        include 'static/maintenance.html';
-        exit;
-    }
-}
-
 // Handle referral code from URL (same as old index.php)
 $referralCode = $_GET['ref'] ?? '';
 $visitTracked = false;
@@ -84,7 +73,6 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
     <link rel="dns-prefetch" href="https://code.jquery.com">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="assets/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://kit.fontawesome.com/4358befd66.js" crossorigin="anonymous" async></script>
     <!-- Required meta tags -->
@@ -93,6 +81,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.12.1/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="assets/css/style.css">
     <title><?= htmlspecialchars($siteName) ?> - <?= htmlspecialchars($siteDescription) ?></title>
     
     <!-- SEO Meta Tags -->
@@ -687,7 +676,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
 <div class="container mt-5 pt-5">
     <div class="row"> 
         <div class="col-12 col-lg-6">
-            <img src="assets/images/index-image.jpeg" 
+            <img src="assets/images/index-image.jpeg" loading="lazy"
                  style="border-radius: 12px;" width="100%" alt="about">
         </div>
         <div class="col-12 col-lg-6 d-flex align-items-center">
@@ -716,16 +705,16 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
             <!-- Mobile Collection Card -->
             <div class="collection-card d-md-none d-block">
                 <a href="shop/category.php">
-                    <img src="./assets/images/collection-banner.jpg" alt="Featured Collection">
+                    <img src="./assets/images/collection-banner.jpg" alt="Featured Collection" loading="lazy">
                 </a>
             </div>
             
             <!-- Desktop Collection Cards -->
             <div class="collection-card">
-                <img src="https://commnsens.com/cdn/shop/files/gempages_523126627069068376-ea8a7deb-b71a-4ad5-9265-7cf040380a0f.png?v=12845835609366065749" alt="Dreamy Flow">
+                <img src="https://commnsens.com/cdn/shop/files/gempages_523126627069068376-ea8a7deb-b71a-4ad5-9265-7cf040380a0f.png?v=12845835609366065749" alt="Dreamy Flow" loading="lazy">
             </div>
             <div class="collection-card">
-                <img src="https://commnsens.com/cdn/shop/files/gempages_523126627069068376-6d15295f-0805-4442-9989-7e7a8e669187.png?v=931527186455049582" alt="Diffusion">
+                <img src="https://commnsens.com/cdn/shop/files/gempages_523126627069068376-6d15295f-0805-4442-9989-7e7a8e669187.png?v=931527186455049582" alt="Diffusion" loading="lazy">
             </div>
         </div>
 
@@ -734,7 +723,7 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
             <!-- Featured Collection -->
             <div class="collection-card d-none d-md-block">
                 <a href="shop/category.php">
-                    <img src="./assets/images/collection-banner.jpg" alt="Featured Collection">
+                    <img src="./assets/images/collection-banner.jpg" alt="Featured Collection" loading="lazy">
                 </a>
             </div>
             
@@ -742,10 +731,10 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
                 <div class="col-md-6">
                     <div class="collection-card">
                         <a href="shop/category.php?category=basics">
-                            <img src="https://commnsens.com/cdn/shop/files/gempages_523126627069068376-f50cbec3-d137-4251-baf4-4efe1e24fed5.png?v=11089955678911056430" alt="Basics Collection">
+                            <img src="https://commnsens.com/cdn/shop/files/gempages_523126627069068376-f50cbec3-d137-4251-baf4-4efe1e24fed5.png?v=11089955678911056430" alt="Basics Collection" loading="lazy">
                         </a>
                         <a href="shop/category.php?category=premium">
-                            <img class="mt-3" src="https://cdn.shopify.com/s/files/1/0643/5245/2848/files/gempages_523126627069068376-7b890183-1ba2-4159-89f0-845a432685a7.png?v=1721423873" alt="Premium Collection">
+                            <img class="mt-3" src="https://cdn.shopify.com/s/files/1/0643/5245/2848/files/gempages_523126627069068376-7b890183-1ba2-4159-89f0-845a432685a7.png?v=1721423873" alt="Premium Collection" loading="lazy">
                         </a>
                     </div>
                 </div>
@@ -758,10 +747,10 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
                     </div>
                     <div class="collection-card">
                         <a href="shop/category.php?category=seasonal">
-                            <img src="https://commnsens.com/cdn/shop/files/gempages_523126627069068376-7c9dd6f7-cc3e-4850-9ca0-ac065816ed87.png?v=3890653826190371144" alt="Seasonal Collection">
+                            <img src="https://commnsens.com/cdn/shop/files/gempages_523126627069068376-7c9dd6f7-cc3e-4850-9ca0-ac065816ed87.png?v=3890653826190371144" alt="Seasonal Collection" loading="lazy">
                         </a>
                         <a href="shop/category.php?category=limited-edition">
-                            <img class="mt-3" src="https://commnsens.com/cdn/shop/files/gempages_523126627069068376-1596c702-69b9-4b61-b118-8806f96982e8.png?v=2808246028600262366" alt="Limited Edition">
+                            <img class="mt-3" src="https://commnsens.com/cdn/shop/files/gempages_523126627069068376-1596c702-69b9-4b61-b118-8806f96982e8.png?v=2808246028600262366" alt="Limited Edition" loading="lazy">
                         </a>
                     </div>
                     <div class="text-right mt-4 d-md-none d-block">
@@ -797,9 +786,9 @@ $walletBalance = $isLoggedIn ? getWalletBalance($currentUser['id']) : ['points' 
                         <a href="shop/product.php?id=<?= $product['id'] ?>" class="text-decoration-none">
                             <div class="image-container2 rounded-0">
                                 <img src="<?= htmlspecialchars(BASE_PATH . ($product['primary_image'] ?: '/assets/images/default-product.jpg')) ?>"
-                                     alt="<?= htmlspecialchars($product['name']) ?>" class="default-img">
+                                     alt="<?= htmlspecialchars($product['name']) ?>" class="default-img" loading="lazy">
                                 <img src="<?= htmlspecialchars(BASE_PATH . ($product['primary_image'] ?: '/assets/images/default-product.jpg')) ?>"
-                                     alt="<?= htmlspecialchars($product['name']) ?>" class="hover-img">
+                                     alt="<?= htmlspecialchars($product['name']) ?>" class="hover-img" loading="lazy">
                             </div>
                             <h5 class="product-title text-dark text-left pl-4"><?= htmlspecialchars($product['name']) ?></h5>
                             <p class="product-price text-dark text-left pl-4">₹<?= number_format($product['price'], 2) ?></p>

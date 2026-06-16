@@ -88,12 +88,17 @@ function handleGetCategories() {
         ");
         
         $categories = $stmt->fetchAll();
-        
+        foreach ($categories as &$cat) {
+            if (!empty($cat['image'])) {
+                $cat['image'] = normalizeImagePath($cat['image']);
+            }
+        }
+
         echo json_encode([
             'success' => true,
             'categories' => $categories
         ]);
-        
+
     } catch (Exception $e) {
         error_log("Error in handleGetCategories: " . $e->getMessage());
         echo json_encode(['success' => false, 'message' => 'Failed to load categories']);
