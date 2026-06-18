@@ -1,29 +1,10 @@
 {
   "version": 2,
   "builds": [
-    { "src": "**/*.php", "use": "vercel-php@0.9.0" }
+    { "src": "_router.php", "use": "vercel-php@0.9.0" }
   ],
   "routes": [
     { "handle": "filesystem" },
-    { "src": "/",                  "dest": "/index.php" },
-    { "src": "/checkout",          "dest": "/checkout.php" },
-    { "src": "/checkout.php",      "dest": "/checkout.php" },
-    { "src": "/track",             "dest": "/track.php" },
-    { "src": "/track.php",         "dest": "/track.php" },
-    { "src": "/profile",           "dest": "/profile.php" },
-    { "src": "/profile.php",       "dest": "/profile.php" },
-    { "src": "/invoice",           "dest": "/invoice.php" },
-    { "src": "/invoice.php",       "dest": "/invoice.php" },
-    { "src": "/shop/(.*)",         "dest": "/shop/$1" },
-    { "src": "/admin/(.*)",        "dest": "/admin/$1" },
-    { "src": "/auth/(.*)",         "dest": "/auth/$1" },
-    { "src": "/account/(.*)",      "dest": "/account/$1" },
-    { "src": "/referral/(.*)",     "dest": "/referral/$1" },
-    { "src": "/wallet/(.*)",       "dest": "/wallet/$1" },
-    { "src": "/includes/(.*)",     "dest": "/includes/$1" },
-    { "src": "/webhooks/(.*)",     "dest": "/webhooks/$1" },
-    { "src": "/assets/(.*)",       "dest": "/assets/$1" },
-    { "src": "/uploads/(.*)",      "dest": "/uploads/$1" },
-    { "src": "/js/(.*)",           "dest": "/js/$1" }
+    { "src": "/(.*)", "dest": "/_router.php" }
   ]
 }
